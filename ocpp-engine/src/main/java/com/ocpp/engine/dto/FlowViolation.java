@@ -7,6 +7,9 @@ public class FlowViolation {
     private Long id;
     private String sessionId;
 
+    /** 위반 발생 원인 메시지의 OCPP messageId (특정 전문에서 발생한 경우) */
+    private String messageId;
+
     /** 충전기 ID */
     private String chargerId;
 

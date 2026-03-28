@@ -85,20 +85,20 @@ public class AnalysisService {
         AnalysisResult result = new AnalysisResult();
         result.setChargerId(request.getChargerId());
         result.setAnalyzedAt(LocalDateTime.now());
-        result.setTotalTransaction(filtered.size());
-        result.setFaultTransactionCount(detections.size());
+        result.setTotalTransaction(transactionCount);
+        result.setFaultTransactionCount(errorTransactionCount);
         result.setAnalysisType(request.getChargerId() != null ? "MANUAL" : "BATCH");
         result.setFileName(request.getFileName());
         result.setSummary(buildSummary(filtered, detections));
         result.setSessionId(sessionId);
-        result.setTransactionCount(transactionCount);
-        result.setErrorTransactionCount(errorTransactionCount);
         analysisResultMapper.insert(result);
 
-        // 10. transaction_detail INSERT
+        // 10. transaction_detail INSERT (max_allowed_packet 초과 방지를 위해 100건씩 분할)
         List<OcppFlowEntry> flowEntries = buildFlowEntries(filtered, request.getChargerId());
         flowEntries.forEach(e -> e.setSessionId(sessionId));
-        if (!flowEntries.isEmpty()) ocppFlowEntryMapper.insertAll(flowEntries);
+        for (int i = 0; i < flowEntries.size(); i += 100) {
+            ocppFlowEntryMapper.insertAll(flowEntries.subList(i, Math.min(i + 100, flowEntries.size())));
+        }
 
         // 11. flow_violation INSERT
         violations.forEach(v -> v.setSessionId(sessionId));
@@ -177,6 +177,7 @@ public class AnalysisService {
 
         for (OcppMessage msg : messages) {
             OcppFlowEntry e = new OcppFlowEntry();
+            e.setMessageId(msg.getUniqueId());
             e.setTimestamp(msg.getTimestamp() != null ? msg.getTimestamp().format(TS_FMT) : "");
             e.setChargerId(msg.getChargerId() != null ? msg.getChargerId() : fallbackChargerId);
 
@@ -262,7 +263,7 @@ public class AnalysisService {
         }
 
         checkHeartbeatInterval(calls, violations, chargerId, messages, uidToDisplay);
-        checkFaultedStatus(calls, violations, chargerId, messages, uidToDisplay);
+        checkFaultedStatus(calls, violations, chargerId, messages, uidToDisplay, uidToTxId);
         checkChargingSessionFlow(calls, violations, chargerId, uidToTxId);
 
         return violations;
@@ -289,6 +290,7 @@ public class AnalysisService {
     private void checkHeartbeatInterval(List<OcppMessage> calls, List<FlowViolation> violations,
                                          String chargerId, List<OcppMessage> allMessages,
                                          Map<String, String> uidToDisplay) {
+
         List<OcppMessage> heartbeats = calls.stream()
                 .filter(m -> "Heartbeat".equals(m.getAction()) && m.getTimestamp() != null)
                 .collect(Collectors.toList());
@@ -305,7 +307,7 @@ public class AnalysisService {
                                 ts.format(TS_FMT),
                                 gapMin),
                         chargerId,
-                        findActiveTxId(allMessages, uidToDisplay, ts));
+                        findActiveTxId(allMessages, uidToDisplay, ts), null);
             }
         }
     }
@@ -313,7 +315,7 @@ public class AnalysisService {
     /** StatusNotification Faulted 감지 */
     private void checkFaultedStatus(List<OcppMessage> calls, List<FlowViolation> violations,
                                      String chargerId, List<OcppMessage> allMessages,
-                                     Map<String, String> uidToDisplay) {
+                                     Map<String, String> uidToDisplay, Map<String, String> uidToTxId) {
         calls.stream()
                 .filter(m -> "StatusNotification".equals(m.getAction()))
                 .filter(m -> m.getPayloadDetail() != null
@@ -323,7 +325,8 @@ public class AnalysisService {
                         "StatusNotification Faulted - errorCode="
                                 + m.getPayloadDetail().getOrDefault("errorCode", ""),
                         chargerId,
-                        findActiveTxId(allMessages, uidToDisplay, m.getTimestamp())));
+                        findActiveTxId(allMessages, uidToDisplay, m.getTimestamp()),
+                        m.getUniqueId()));
     }
 
     /** 충전 세션(StartTx→StopTx)별 KEVIT 흐름 검증 */
@@ -361,7 +364,7 @@ public class AnalysisService {
             if (!hasPreparing) {
                 addViolation(violations, "WARN", stTs,
                         sessionLabel + ": StartTransaction 전 StatusNotification(Preparing) 없음",
-                        chargerId, txId);
+                        chargerId, txId, null);
             }
 
             // 대응 StopTx 탐색
@@ -374,7 +377,7 @@ public class AnalysisService {
             if (stp == null) {
                 addViolation(violations, "WARN", stTs,
                         sessionLabel + ": 대응하는 StopTransaction 없음",
-                        chargerId, txId);
+                        chargerId, txId, null);
                 continue;
             }
 
@@ -391,7 +394,7 @@ public class AnalysisService {
             if (!hasCharging) {
                 addViolation(violations, "WARN", stTs,
                         sessionLabel + ": StartTransaction 후 StatusNotification(Charging) 없음",
-                        chargerId, txId);
+                        chargerId, txId, null);
             }
 
             // StopTx 이후 5분 내 Finishing / Available 체크
@@ -413,20 +416,22 @@ public class AnalysisService {
             if (!hasFinishing)
                 addViolation(violations, "WARN", stpTs,
                         sessionLabel + ": StopTransaction 후 StatusNotification(Finishing) 없음",
-                        chargerId, txId);
+                        chargerId, txId, null);
             if (!hasAvailable)
                 addViolation(violations, "WARN", stpTs,
                         sessionLabel + ": StopTransaction 후 StatusNotification(Available) 없음",
-                        chargerId, txId);
+                        chargerId, txId, null);
         }
     }
 
     private void addViolation(List<FlowViolation> violations, String severity,
-                               LocalDateTime ts, String message, String chargerId, String transactionId) {
+                               LocalDateTime ts, String message, String chargerId,
+                               String transactionId, String messageId) {
         FlowViolation v = new FlowViolation();
         v.setSeverity(severity);
         v.setChargerId(chargerId);
         v.setTransactionId(transactionId);
+        v.setMessageId(messageId);
         v.setTimestamp(ts != null ? ts.format(TS_FMT) : "");
         v.setMessage(message);
         violations.add(v);

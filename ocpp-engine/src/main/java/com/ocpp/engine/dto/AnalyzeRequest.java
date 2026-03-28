@@ -26,4 +26,7 @@ public class AnalyzeRequest {
 
     /** 서버 로컬 파일 경로 (logContent가 없을 때 파일 직접 읽기) */
     private String filePath;
+
+    /** 파일 URL (참고용) */
+    private String fileUrl;
 }

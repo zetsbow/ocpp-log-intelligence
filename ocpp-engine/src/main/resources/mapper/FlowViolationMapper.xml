@@ -6,6 +6,7 @@
     <resultMap id="rm" type="FlowViolation">
         <id     property="id"            column="id"/>
         <result property="sessionId"     column="session_id"/>
+        <result property="messageId"     column="message_id"/>
         <result property="transactionId" column="transaction_id"/>
         <result property="chargerId"     column="charger_id"/>
         <result property="severity"      column="severity"/>
@@ -15,10 +16,10 @@
 
     <insert id="insertAll">
         INSERT INTO flow_violation
-            (session_id, transaction_id, charger_id, severity, log_timestamp, message)
+            (session_id, message_id, transaction_id, charger_id, severity, log_timestamp, message)
         VALUES
         <foreach collection="list" item="v" separator=",">
-            (#{v.sessionId}, #{v.transactionId}, #{v.chargerId}, #{v.severity}, #{v.timestamp}, #{v.message})
+            (#{v.sessionId}, #{v.messageId}, #{v.transactionId}, #{v.chargerId}, #{v.severity}, #{v.timestamp}, #{v.message})
         </foreach>
     </insert>
 

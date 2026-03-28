@@ -9,6 +9,9 @@ public class OcppFlowEntry {
     private Long id;
     private String sessionId;
 
+    /** OCPP 메시지 ID ([2,"<id>","Action",{...}]의 두 번째 요소) */
+    private String messageId;
+
     /** 로그 타임스탬프 (yyyy-MM-dd HH:mm:ss) */
     private String timestamp;
 
