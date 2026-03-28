@@ -9,9 +9,10 @@ DROP TABLE IF EXISTS ocpp_flow_entry;
 CREATE TABLE IF NOT EXISTS transaction_detail (
     id             BIGINT       NOT NULL AUTO_INCREMENT,
     session_id     VARCHAR(50),
+    message_id     VARCHAR(100),
     transaction_id VARCHAR(50),
     charger_id     VARCHAR(50),
-    log_timestamp  VARCHAR(20),
+    log_timestamp  VARCHAR(30),
     action         VARCHAR(100),
     message_type   VARCHAR(20),
     direction      VARCHAR(10),
@@ -20,6 +21,11 @@ CREATE TABLE IF NOT EXISTS transaction_detail (
     PRIMARY KEY (id),
     KEY idx_session_id (session_id)
 );
+
+-- 기존 테이블에 message_id 컬럼이 없는 경우 추가 (이미 있으면 무시)
+ALTER TABLE transaction_detail
+    ADD COLUMN IF NOT EXISTS message_id VARCHAR(100) AFTER session_id,
+    MODIFY COLUMN log_timestamp VARCHAR(30);
 
 -- KEVIT 충전 흐름 위반 이슈 테이블 (세션 ID 기반)
 DROP TABLE IF EXISTS flow_violation;

@@ -6,6 +6,7 @@ import lombok.Data;
 public class OcppFlowEntryDto {
     private Long   id;
     private String sessionId;
+    private String messageId;
     private String transactionId;
     private String chargerId;
     private String timestamp;

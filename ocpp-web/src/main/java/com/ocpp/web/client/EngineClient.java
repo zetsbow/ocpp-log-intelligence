@@ -3,7 +3,6 @@ package com.ocpp.web.client;
 import com.ocpp.web.dto.AnalysisResultDto;
 import com.ocpp.web.dto.AnalyzeRequestDto;
 import com.ocpp.web.dto.FaultPatternDto;
-import com.ocpp.web.dto.OcppFlowEntryDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -111,16 +110,6 @@ public class EngineClient {
             log.error("[EngineClient] 결과 조회 실패 - sessionId={}, error={}", sessionId, e.getMessage());
             throw e;
         }
-    }
-
-    /** sessionId로 트랜잭션 상세 목록 조회 */
-    public List<OcppFlowEntryDto> getTransactionDetail(String sessionId) {
-        String url = engineUrl + "/api/transaction-detail/" + sessionId;
-        log.debug("[EngineClient] GET {}", url);
-        ResponseEntity<List<OcppFlowEntryDto>> res = restTemplate.exchange(
-                url, HttpMethod.GET, jsonEntity(null),
-                new ParameterizedTypeReference<>() {});
-        return res.getBody();
     }
 
     /* ── 패턴 API ───────────────────────────────────────── */

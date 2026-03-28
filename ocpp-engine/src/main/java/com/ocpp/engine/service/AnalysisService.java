@@ -10,10 +10,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -31,6 +30,7 @@ public class AnalysisService {
     private final FaultDetectionMapper faultDetectionMapper;
     private final OcppFlowEntryMapper ocppFlowEntryMapper;
     private final FlowViolationMapper flowViolationMapper;
+    private final RestTemplate restTemplate;
 
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -41,15 +41,21 @@ public class AnalysisService {
     public AnalysisResult analyze(AnalyzeRequest request) {
         log.info("분석 시작 - 충전기: {}, 파일: {}", request.getChargerId(), request.getFileName());
 
-        // 0. filePath로 파일 직접 읽기 (logContent가 없을 때)
+        // 0. fileUrl로 HTTP GET → logContent 세팅 (logContent가 없을 때)
         if ((request.getLogContent() == null || request.getLogContent().isBlank())
                 && request.getFileUrl() != null && !request.getFileUrl().isBlank()) {
             try {
-                request.setLogContent(Files.readString(Paths.get(request.getFileUrl())));
-                if (request.getFileName() == null)
-                    request.setFileName(Paths.get(request.getFileUrl()).getFileName().toString());
-            } catch (IOException e) {
-                throw new RuntimeException("로그 파일 읽기 실패: " + request.getFileUrl(), e);
+                String content = restTemplate.getForObject(URI.create(request.getFileUrl()), String.class);
+                if (content == null || content.isBlank())
+                    throw new RuntimeException("파일 내용이 비어있습니다: " + request.getFileUrl());
+                request.setLogContent(content);
+                if (request.getFileName() == null) {
+                    String url = request.getFileUrl();
+                    request.setFileName(url.substring(url.lastIndexOf('/') + 1));
+                }
+                log.info("[AnalysisService] fileUrl 다운로드 완료: {} bytes", content.length());
+            } catch (Exception e) {
+                throw new RuntimeException("로그 파일 URL 호출 실패: " + request.getFileUrl() + " → " + e.getMessage(), e);
             }
         }
 
@@ -62,8 +68,11 @@ public class AnalysisService {
         // 3. 패턴 매칭 (기존 FaultPattern 기반)
         List<FaultDetection> detections = patternMatcher.match(filtered);
 
-        // 4. 세션 ID 추출 (파일명 마지막 _ 뒤 문자열)
-        String sessionId = extractSessionId(request.getFileName());
+        // 4. 세션 ID: web에서 전달한 값 우선, 없으면 파일명에서 추출
+        String sessionId = (request.getSessionId() != null && !request.getSessionId().isBlank())
+                ? request.getSessionId()
+                : extractSessionId(request.getFileName());
+        log.info("[AnalysisService] sessionId={} (fileName={})", sessionId, request.getFileName());
 
         // 5. total_transaction: 시작 신호(Preparing/Authorize/RemoteStartTransaction)가 있는 완전한 세션 건수
         int transactionCount = countCompleteSessionStarts(filtered);
@@ -163,26 +172,35 @@ public class AnalysisService {
     // ── 흐름 요약 ────────────────────────────────────────────────────────────
 
     private List<OcppFlowEntry> buildFlowEntries(List<OcppMessage> messages, String fallbackChargerId) {
-        // Call uniqueId → displayAction 매핑
-        Map<String, String> uidToDisplay = messages.stream()
-                .filter(OcppMessage::isCall)
-                .filter(m -> m.getUniqueId() != null)
-                .collect(Collectors.toMap(
-                        OcppMessage::getUniqueId,
-                        OcppMessage::getDisplayAction,
-                        (a, b) -> a));
 
-        // Pre-scan: StartTransaction CallResult uid → transactionId
+        // ── Pre-scan 1: Call uniqueId → action 매핑 ──────────────────────────
+        Map<String, String> uidToAction = new HashMap<>();     // uniqueId → raw action
+        Map<String, String> uidToDisplay = new HashMap<>();    // uniqueId → displayAction
+        for (OcppMessage msg : messages) {
+            if (msg.isCall() && msg.getUniqueId() != null) {
+                uidToAction.put(msg.getUniqueId(), msg.getAction());
+                uidToDisplay.put(msg.getUniqueId(), msg.getDisplayAction());
+            }
+        }
+
+        // ── Pre-scan 2: StartTransaction CallResult uid → transactionId 매핑 ─
+        // StartTransaction CallResult payload: {"transactionId": 123, "idTagInfo":{...}}
         Map<String, String> uidToTxId = new HashMap<>();
         for (OcppMessage msg : messages) {
-            if (msg.isCallResult() && msg.getTransactionId() != null
-                    && "StartTransaction".equals(uidToDisplay.get(msg.getUniqueId()))) {
+            if (msg.isCallResult()
+                    && msg.getUniqueId() != null
+                    && msg.getTransactionId() != null
+                    && "StartTransaction".equals(uidToAction.get(msg.getUniqueId()))) {
                 uidToTxId.put(msg.getUniqueId(), msg.getTransactionId());
             }
         }
 
+        // ── Pre-scan 3: StartTransaction Call uniqueId → transactionId 역매핑 ─
+        // StartTransaction Call 행 자체에도 txId를 붙이기 위해
+        // (Call의 uniqueId == CallResult의 uniqueId 이므로 동일 키 사용)
+
         List<OcppFlowEntry> entries = new ArrayList<>();
-        String activeTxId = null;
+        String activeTxId = null;   // 현재 진행 중인 transactionId
 
         for (OcppMessage msg : messages) {
             OcppFlowEntry e = new OcppFlowEntry();
@@ -190,46 +208,62 @@ public class AnalysisService {
             e.setTimestamp(msg.getTimestamp() != null ? msg.getTimestamp().format(TS_FMT) : "");
             e.setChargerId(msg.getChargerId() != null ? msg.getChargerId() : fallbackChargerId);
 
-            String resolvedAction = msg.isCall()
+            // 이 메시지의 action (Call이면 직접, CallResult/Error이면 uidToAction으로 역조회)
+            String rawAction = msg.isCall()
                     ? msg.getAction()
-                    : uidToDisplay.getOrDefault(msg.getUniqueId(), "");
+                    : uidToAction.getOrDefault(msg.getUniqueId(), "");
 
             if (msg.isCall()) {
+                // ── Call 처리 ──────────────────────────────────────────────
                 e.setAction(msg.getDisplayAction());
                 e.setMessageType("Call");
                 e.setDirection("CP→CS");
-                e.setDetail(msg.getPayloadDetail());
                 e.setDetailText(toDetailText(msg.getPayloadDetail()));
 
+                if ("StartTransaction".equals(rawAction)) {
+                    // StartTransaction Call: transactionId는 pre-scan으로 확보
+                    String txId = uidToTxId.get(msg.getUniqueId());
+                    e.setTransactionId(txId);
+                } else if ("StopTransaction".equals(rawAction)) {
+                    // StopTransaction에는 payload에 transactionId 있음
+                    e.setTransactionId(msg.getTransactionId() != null
+                            ? msg.getTransactionId() : activeTxId);
+                } else {
+                    e.setTransactionId(activeTxId);
+                }
+
             } else if (msg.isCallResult()) {
+                // ── CallResult 처리 ────────────────────────────────────────
                 e.setAction(uidToDisplay.getOrDefault(msg.getUniqueId(), "Unknown"));
                 e.setMessageType("CallResult");
                 e.setDirection("CS→CP");
                 e.setStatus(msg.getStatus());
-                if ("StartTransaction".equals(resolvedAction) && msg.getTransactionId() != null) {
-                    Map<String, String> d = new LinkedHashMap<>();
-                    d.put("transactionId", msg.getTransactionId());
-                    e.setDetail(d);
-                    e.setDetailText("transactionId=" + msg.getTransactionId());
+
+                if ("StartTransaction".equals(rawAction)) {
+                    // StartTransaction CallResult: transactionId 확정 → activeTxId 갱신
+                    String txId = msg.getTransactionId();
+                    if (txId != null) {
+                        activeTxId = txId;
+                        uidToTxId.put(msg.getUniqueId(), txId);   // 재확인용 갱신
+                    }
+                    e.setTransactionId(activeTxId);
+                    // detailText에 transactionId 표시
+                    if (activeTxId != null) e.setDetailText("transactionId=" + activeTxId);
+
+                } else if ("StopTransaction".equals(rawAction)) {
+                    e.setTransactionId(activeTxId);
+                    activeTxId = null;   // 트랜잭션 종료
+
+                } else {
+                    e.setTransactionId(activeTxId);
                 }
 
             } else {
+                // ── CallError 처리 ─────────────────────────────────────────
                 e.setAction(uidToDisplay.getOrDefault(msg.getUniqueId(), "Unknown"));
                 e.setMessageType("CallError");
                 e.setDirection("CS→CP");
                 e.setStatus(msg.getStatus());
-            }
-
-            // transactionId 결정
-            if (msg.isCall() && "StartTransaction".equals(resolvedAction)) {
-                e.setTransactionId(uidToTxId.get(msg.getUniqueId()));
-            } else if (msg.isCallResult() && "StartTransaction".equals(resolvedAction)) {
-                if (msg.getTransactionId() != null) activeTxId = msg.getTransactionId();
-                e.setTransactionId(activeTxId);
-            } else if ("StopTransaction".equals(resolvedAction)) {
-                e.setTransactionId(activeTxId);
-                if (msg.isCallResult()) activeTxId = null;
-            } else {
                 e.setTransactionId(activeTxId);
             }
 
