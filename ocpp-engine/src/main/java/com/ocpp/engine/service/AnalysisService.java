@@ -12,6 +12,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -21,39 +26,49 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AnalysisService {
 
-    private final OcppLogParser parser;
-    private final PatternMatcherService patternMatcher;
-    private final AnalysisResultMapper analysisResultMapper;
-    private final FaultDetectionMapper faultDetectionMapper;
+    private final OcppLogParser          parser;
+    private final PatternMatcherService  patternMatcher;
+    private final AnalysisResultMapper   analysisResultMapper;
+    private final FaultDetectionMapper   faultDetectionMapper;
 
     /**
      * 기능1·2: 로그 분석 메인 로직
+     * - filePath가 있으면 해당 파일을 직접 읽음
+     * - logContent가 있으면 내용을 그대로 사용 (배치 스케줄러용)
      */
     @Transactional
     public AnalysisResult analyze(AnalyzeRequest request) {
-        log.info("분석 시작 - 충전기: {}, 파일: {}", request.getChargerId(), request.getFileName());
+        log.info("분석 시작 - 충전기: {}, 파일경로: {}", request.getChargerId(), request.getFilePath());
 
-        // 1. 파싱
-        List<OcppMessage> allMessages = parser.parse(request.getLogContent());
+        // 1. 로그 내용 확보: filePath 우선 → logContent fallback
+        String logContent = resolveLogContent(request);
+        if (logContent == null || logContent.isBlank()) {
+            throw new IllegalArgumentException("분석할 로그 내용이 없습니다. filePath 또는 logContent를 확인하세요.");
+        }
 
-        // 2. 기능2: 충전기 ID + 시간 필터링
+        // 2. 파싱
+        List<OcppMessage> allMessages = parser.parse(logContent);
+
+        // 3. 충전기 ID + 시간 필터링
         List<OcppMessage> filtered = filterMessages(allMessages, request);
+        log.info("필터링 결과: 전체 {}건 → 필터 후 {}건", allMessages.size(), filtered.size());
 
-        // 3. 패턴 매칭
+        // 4. 패턴 매칭
         List<FaultDetection> detections = patternMatcher.match(filtered);
 
-        // 4. 분석 이력 저장
+        // 5. 분석 이력 저장
         AnalysisResult result = new AnalysisResult();
         result.setChargerId(request.getChargerId());
         result.setAnalyzedAt(LocalDateTime.now());
         result.setTotalMsgCount(filtered.size());
         result.setFaultCount(detections.size());
         result.setAnalysisType(request.getChargerId() != null ? "MANUAL" : "BATCH");
-        result.setFileName(request.getFileName());
+        result.setFileName(request.getFileName() != null ? request.getFileName()
+                : (request.getFilePath() != null ? Paths.get(request.getFilePath()).getFileName().toString() : "unknown"));
         result.setSummary(buildSummary(filtered, detections));
         analysisResultMapper.insert(result);
 
-        // 5. 탐지 결과 저장
+        // 6. 탐지 결과 저장
         if (!detections.isEmpty()) {
             detections.forEach(d -> d.setAnalysisId(result.getId()));
             faultDetectionMapper.insertAll(detections);
@@ -62,6 +77,26 @@ public class AnalysisService {
         result.setDetections(detections);
         log.info("분석 완료 - 총 {}개 메시지, {}개 장애 탐지", filtered.size(), detections.size());
         return result;
+    }
+
+    /**
+     * filePath → 파일 직접 읽기 / logContent → 그대로 사용
+     */
+    private String resolveLogContent(AnalyzeRequest request) {
+        if (request.getFilePath() != null && !request.getFilePath().isBlank()) {
+            Path path = Paths.get(request.getFilePath());
+            if (!Files.exists(path)) {
+                throw new IllegalArgumentException("파일을 찾을 수 없습니다: " + request.getFilePath());
+            }
+            try {
+                String content = Files.readString(path, StandardCharsets.UTF_8);
+                log.info("파일 읽기 완료: {} ({}bytes)", path.getFileName(), content.length());
+                return content;
+            } catch (IOException e) {
+                throw new RuntimeException("파일 읽기 실패: " + request.getFilePath(), e);
+            }
+        }
+        return request.getLogContent();
     }
 
     private List<OcppMessage> filterMessages(List<OcppMessage> messages, AnalyzeRequest req) {
@@ -82,12 +117,12 @@ public class AnalysisService {
     }
 
     private String buildSummary(List<OcppMessage> messages, List<FaultDetection> detections) {
-        long callCount = messages.stream().filter(OcppMessage::isCall).count();
+        long callCount   = messages.stream().filter(OcppMessage::isCall).count();
         long resultCount = messages.stream().filter(OcppMessage::isCallResult).count();
-        long errorCount = messages.stream().filter(OcppMessage::isCallError).count();
-        long highCount = detections.stream().filter(d -> "HIGH".equals(d.getSeverity())).count();
-        long medCount = detections.stream().filter(d -> "MEDIUM".equals(d.getSeverity())).count();
-        return String.format("Call: %d / CallResult: %d / CallError: %d | 장애 HIGH: %d, MEDIUM: %d",
+        long errorCount  = messages.stream().filter(OcppMessage::isCallError).count();
+        long highCount   = detections.stream().filter(d -> "HIGH".equals(d.getSeverity())).count();
+        long medCount    = detections.stream().filter(d -> "MEDIUM".equals(d.getSeverity())).count();
+        return String.format("Call:%d / CallResult:%d / CallError:%d | 장애 HIGH:%d, MEDIUM:%d",
                 callCount, resultCount, errorCount, highCount, medCount);
     }
 }

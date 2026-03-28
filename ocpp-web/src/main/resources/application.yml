@@ -21,6 +21,11 @@ spring:
     encoding: UTF-8
     prefix: classpath:/templates/
     suffix: .html
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 100MB
 
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
@@ -32,6 +37,12 @@ mybatis:
 
 engine:
   url: http://localhost:7778
+
+# 업로드된 로그 파일이 저장될 서버 경로 (engine과 공유)
+ocpp:
+  log:
+    upload-dir: C:/ocpp-logs/upload
+    archive-dir: C:/ocpp-logs/archive
 
 logging:
   level:

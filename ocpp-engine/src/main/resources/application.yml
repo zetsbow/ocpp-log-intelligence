@@ -25,6 +25,12 @@ mybatis:
     default-fetch-size: 100
     default-statement-timeout: 30
 
+# web 모듈과 동일한 경로를 바라봄
+ocpp:
+  log:
+    upload-dir: C:/ocpp-logs/upload
+    archive-dir: C:/ocpp-logs/archive
+
 logging:
   level:
     com.ocpp: DEBUG

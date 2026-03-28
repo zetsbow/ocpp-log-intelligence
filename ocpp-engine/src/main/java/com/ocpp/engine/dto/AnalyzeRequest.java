@@ -4,23 +4,21 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * 기능2: 충전기 로그 분석 요청 DTO (ocpp-web → ocpp-engine)
- */
 @Data
 public class AnalyzeRequest {
-    /** 분석 대상 충전기 ID */
+    /** 충전기 ID 필터 */
     private String chargerId;
 
-    /** 조회 시작 시간 */
+    /** 시간 범위 필터 */
     private LocalDateTime fromTime;
-
-    /** 조회 종료 시간 */
     private LocalDateTime toTime;
 
-    /** 업로드된 로그 파일 내용 (raw text) */
-    private String logContent;
+    /** 서버 저장 경로 — engine이 직접 파일을 읽음 */
+    private String filePath;
 
-    /** 파일명 */
+    /** 원본 파일명 (이력 저장용) */
     private String fileName;
+
+    /** 하위 호환: 파일 내용 직접 전달 (배치 스케줄러용) */
+    private String logContent;
 }
