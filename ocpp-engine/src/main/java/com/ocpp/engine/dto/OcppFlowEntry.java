@@ -6,7 +6,7 @@ import java.util.Map;
 
 @Data
 public class OcppFlowEntry {
-    private Long id;
+    private Long   id;
     private String sessionId;
 
     /** OCPP 메시지 ID ([2,"<id>","Action",{...}]의 두 번째 요소) */
@@ -15,7 +15,7 @@ public class OcppFlowEntry {
     /** 로그 타임스탬프 (yyyy-MM-dd HH:mm:ss) */
     private String timestamp;
 
-    /** 충전기 ID - 모든 행에 포함 */
+    /** 충전기 ID */
     private String chargerId;
 
     /** 트랜잭션 ID (StartTransaction ~ StopTransaction 세션 식별) */
@@ -33,13 +33,12 @@ public class OcppFlowEntry {
     /** 응답 상태 (CallResult): Accepted, Rejected, currentTime=... 등 */
     private String status;
 
-    /** 위반이 발생한 트랜잭션의 전문 여부: Y / N */
+    /** 장애 여부 (Y:장애, N:정상) */
     private String isFault;
 
     /**
      * DB 저장용 상세 정보 문자열
      * - StatusNotification : "status=Charging, errorCode=NoError"
-     *                        "status=Faulted, errorCode=OtherError"
      * - MeterValues        : "Wh=3770, A=119, V=714, SoC%=21"
      * - StartTransaction   : "meterStart=12072910, idTag=1010010197328263"
      * - StartTx CallResult : "transactionId=326000607"

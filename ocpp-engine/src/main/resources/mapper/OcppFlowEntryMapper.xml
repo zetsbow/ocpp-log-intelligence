@@ -29,7 +29,10 @@
     </insert>
 
     <select id="findByAnalysisId" resultMap="rm">
-        SELECT * FROM transaction_detail
+        SELECT
+            id, session_id, message_id, transaction_id, charger_id,
+            log_timestamp, action, message_type, direction, status, detail_text, is_fault
+        FROM transaction_detail
         WHERE session_id = #{analysisId}
         ORDER BY id
     </select>

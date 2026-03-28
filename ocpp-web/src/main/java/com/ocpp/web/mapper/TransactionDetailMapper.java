@@ -12,19 +12,23 @@ import java.util.List;
 @Mapper
 public interface TransactionDetailMapper {
 
-    /** sessionId + 검색조건으로 페이징 조회 */
+    /** 검색조건 + 페이징 조회 */
     List<OcppFlowEntryDto> findByConditionPaged(
-            @Param("sessionId")  String sessionId,
-            @Param("chargerId")  String chargerId,
-            @Param("action")     String action,
-            @Param("direction")  String direction,
-            @Param("offset")     int    offset,
-            @Param("size")       int    size);
+            @Param("sessionId")     String  sessionId,
+            @Param("transactionId") String  transactionId,
+            @Param("chargerId")     String  chargerId,
+            @Param("action")        String  action,
+            @Param("direction")     String  direction,
+            @Param("isFault")       Integer isFault,
+            @Param("offset")        int     offset,
+            @Param("size")          int     size);
 
-    /** sessionId + 검색조건으로 총 건수 조회 */
+    /** 검색조건 총 건수 조회 */
     int countByCondition(
-            @Param("sessionId")  String sessionId,
-            @Param("chargerId")  String chargerId,
-            @Param("action")     String action,
-            @Param("direction")  String direction);
+            @Param("sessionId")     String  sessionId,
+            @Param("transactionId") String  transactionId,
+            @Param("chargerId")     String  chargerId,
+            @Param("action")        String  action,
+            @Param("direction")     String  direction,
+            @Param("isFault")       Integer isFault);
 }

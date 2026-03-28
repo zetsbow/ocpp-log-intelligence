@@ -265,6 +265,14 @@ public class AnalysisService {
                 e.setDirection("CS→CP");
                 e.setStatus(msg.getStatus());
                 e.setTransactionId(activeTxId);
+                e.setIsFault("Y");  // CallError는 항상 장애
+            }
+
+            // StatusNotification Faulted → 장애 마킹
+            if ("StatusNotification".equals(e.getAction())
+                    && msg.getPayloadDetail() != null
+                    && "Faulted".equals(msg.getPayloadDetail().get("status"))) {
+                e.setIsFault("Y");
             }
 
             entries.add(e);
