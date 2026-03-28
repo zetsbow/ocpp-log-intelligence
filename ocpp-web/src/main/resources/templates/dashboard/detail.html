@@ -190,7 +190,7 @@
     <div class="card-header">
       <span><i class="bi bi-table me-2"></i>트랜잭션 상세 <small style="font-size:.72rem;color:#90a4ae;font-weight:400">(transaction_detail)</small></span>
       <span class="kpi-mini"
-            th:text="${details != null} ? ${details.size()} + '건' : '0건'">0건</span>
+            th:text="${totalCount != null} ? ${totalCount} + '건' : '0건'">0건</span>
     </div>
 
     <!-- 빈 상태 -->
@@ -217,8 +217,9 @@
         </thead>
         <tbody>
           <tr th:each="d,i : ${details}">
-            <!-- No -->
-            <td style="color:#b0bec5;font-size:.75rem" th:text="${i.count}">1</td>
+            <!-- No (전체 기준 행번호) -->
+            <td style="color:#b0bec5;font-size:.75rem"
+                th:text="${startRow + i.index}">1</td>
 
             <!-- 트랜잭션 ID -->
             <td>
@@ -263,6 +264,79 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- ── 페이지네이션 ───────────────────────────────── -->
+    <div th:if="${totalPages != null and totalPages > 1}"
+         class="d-flex align-items-center justify-content-between px-3 py-2"
+         style="border-top:1px solid #f0f4f8;background:#fafbfc">
+
+      <!-- 총 건수 표시 -->
+      <div style="font-size:.8rem;color:#90a4ae">
+        총 <strong th:text="${totalCount}">0</strong>건
+        (<span th:text="${currentPage}">1</span> / <span th:text="${totalPages}">1</span> 페이지)
+      </div>
+
+      <!-- 페이지 버튼 -->
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+
+          <!-- 이전 그룹 (◀◀) -->
+          <li class="page-item" th:if="${pageStart > 1}">
+            <a class="page-link"
+               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${pageStart - 1}, size=${pageSize})}">
+              «
+            </a>
+          </li>
+
+          <!-- 이전 페이지 (◀) -->
+          <li class="page-item" th:classappend="${!hasPrev} ? 'disabled'">
+            <a class="page-link"
+               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${prevPage}, size=${pageSize})}">
+              ‹
+            </a>
+          </li>
+
+          <!-- 페이지 번호 -->
+          <li class="page-item"
+              th:each="p : ${#numbers.sequence(pageStart, pageEnd)}"
+              th:classappend="${p == currentPage} ? 'active'">
+            <a class="page-link"
+               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${p}, size=${pageSize})}"
+               th:text="${p}">1</a>
+          </li>
+
+          <!-- 다음 페이지 (▶) -->
+          <li class="page-item" th:classappend="${!hasNext} ? 'disabled'">
+            <a class="page-link"
+               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${nextPage}, size=${pageSize})}">
+              ›
+            </a>
+          </li>
+
+          <!-- 다음 그룹 (▶▶) -->
+          <li class="page-item" th:if="${pageEnd < totalPages}">
+            <a class="page-link"
+               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${pageEnd + 1}, size=${pageSize})}">
+              »
+            </a>
+          </li>
+
+        </ul>
+      </nav>
+
+      <!-- 페이지 크기 선택 -->
+      <div style="font-size:.8rem;color:#90a4ae;display:flex;align-items:center;gap:6px">
+        페이지당
+        <select class="form-select form-select-sm" style="width:70px"
+                onchange="location.href='/dashboard/detail/' + '[[${sessionId}]]' + '?page=1&size=' + this.value">
+          <option th:value="10"  th:selected="${pageSize == 10}">10</option>
+          <option th:value="20"  th:selected="${pageSize == 20}">20</option>
+          <option th:value="50"  th:selected="${pageSize == 50}">50</option>
+          <option th:value="100" th:selected="${pageSize == 100}">100</option>
+        </select>
+        건
+      </div>
     </div>
   </div>
 

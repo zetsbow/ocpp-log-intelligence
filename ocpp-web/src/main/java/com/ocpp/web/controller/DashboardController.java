@@ -11,6 +11,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -52,7 +53,10 @@ public class DashboardController {
     }
 
     @GetMapping("/dashboard/detail/{sessionId}")
-    public String detail(@PathVariable String sessionId, Model model) {
+    public String detail(@PathVariable String sessionId,
+                         @RequestParam(defaultValue = "1") int page,
+                         @RequestParam(defaultValue = "20") int size,
+                         Model model) {
         model.addAttribute("currentMenu", "dashboard");
         model.addAttribute("sessionId", sessionId);
 
@@ -65,14 +69,41 @@ public class DashboardController {
             model.addAttribute("result", null);
         }
 
-        // 트랜잭션 상세 — ocpp-web 자체 DB 직접 조회 (engine과 무관하게 독립 실행)
+        // 트랜잭션 상세 — 페이징 조회
         try {
-            List<OcppFlowEntryDto> details = transactionDetailService.getBySessionId(sessionId);
-            log.info("[DashboardController] 트랜잭션 상세 조회 완료 - sessionId={}, 건수={}", sessionId, details.size());
-            model.addAttribute("details", details);
+            int totalCount  = transactionDetailService.countBySessionId(sessionId);
+            int totalPages  = (int) Math.ceil((double) totalCount / size);
+            int currentPage = Math.max(1, Math.min(page, Math.max(totalPages, 1)));
+
+            List<OcppFlowEntryDto> details = transactionDetailService.getBySessionIdPaged(sessionId, currentPage, size);
+            log.info("[DashboardController] 트랜잭션 상세 조회 완료 - sessionId={}, page={}/{}, 건수={}",
+                    sessionId, currentPage, totalPages, details.size());
+
+            int startRow = (currentPage - 1) * size + 1;  // 현재 페이지 시작 행 번호
+
+            model.addAttribute("details",      details);
+            model.addAttribute("currentPage",  currentPage);
+            model.addAttribute("totalPages",   totalPages);
+            model.addAttribute("totalCount",   totalCount);
+            model.addAttribute("pageSize",     size);
+            model.addAttribute("startRow",     startRow);
+            model.addAttribute("hasPrev",      currentPage > 1);
+            model.addAttribute("hasNext",      currentPage < totalPages);
+            model.addAttribute("prevPage",     currentPage - 1);
+            model.addAttribute("nextPage",     currentPage + 1);
+
+            // 페이지 그룹 (최대 10개 표시)
+            int pageGroupSize = 10;
+            int pageStart = ((currentPage - 1) / pageGroupSize) * pageGroupSize + 1;
+            int pageEnd   = Math.min(pageStart + pageGroupSize - 1, totalPages);
+            model.addAttribute("pageStart", pageStart);
+            model.addAttribute("pageEnd",   pageEnd);
+
         } catch (Exception e) {
             log.error("[DashboardController] 트랜잭션 상세 조회 실패 - sessionId={}, error={}", sessionId, e.getMessage(), e);
-            model.addAttribute("details", List.of());
+            model.addAttribute("details",    List.of());
+            model.addAttribute("totalCount", 0);
+            model.addAttribute("totalPages", 0);
         }
 
         return "dashboard/detail";

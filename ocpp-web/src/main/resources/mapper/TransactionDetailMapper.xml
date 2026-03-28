@@ -17,7 +17,7 @@
         <result property="detailText"    column="detail_text"/>
     </resultMap>
 
-    <!-- sessionId로 트랜잭션 상세 목록 조회 -->
+    <!-- sessionId로 트랜잭션 상세 목록 조회 (전체) -->
     <select id="findBySessionId" resultMap="rm">
         SELECT
             id,
@@ -36,7 +36,27 @@
         ORDER BY id ASC
     </select>
 
-    <!-- sessionId 건수 조회 -->
+    <!-- sessionId로 트랜잭션 상세 목록 조회 (페이징) -->
+    <select id="findBySessionIdPaged" resultMap="rm">
+        SELECT
+            id,
+            session_id,
+            IFNULL(message_id, '') AS message_id,
+            transaction_id,
+            charger_id,
+            log_timestamp,
+            action,
+            message_type,
+            direction,
+            status,
+            detail_text
+        FROM transaction_detail
+        WHERE session_id = #{sessionId}
+        ORDER BY id ASC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- sessionId 총 건수 조회 -->
     <select id="countBySessionId" resultType="int">
         SELECT COUNT(*) FROM transaction_detail WHERE session_id = #{sessionId}
     </select>

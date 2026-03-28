@@ -12,9 +12,19 @@ import java.util.List;
 @Mapper
 public interface TransactionDetailMapper {
 
-    /** sessionId로 트랜잭션 상세 목록 조회 */
-    List<OcppFlowEntryDto> findBySessionId(@Param("sessionId") String sessionId);
+    /** sessionId + 검색조건으로 페이징 조회 */
+    List<OcppFlowEntryDto> findByConditionPaged(
+            @Param("sessionId")  String sessionId,
+            @Param("chargerId")  String chargerId,
+            @Param("action")     String action,
+            @Param("direction")  String direction,
+            @Param("offset")     int    offset,
+            @Param("size")       int    size);
 
-    /** sessionId에 해당하는 레코드 건수 조회 */
-    int countBySessionId(@Param("sessionId") String sessionId);
+    /** sessionId + 검색조건으로 총 건수 조회 */
+    int countByCondition(
+            @Param("sessionId")  String sessionId,
+            @Param("chargerId")  String chargerId,
+            @Param("action")     String action,
+            @Param("direction")  String direction);
 }
