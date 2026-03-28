@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ocpp.engine.mapper.FaultDetectionMapper">
+
+    <resultMap id="detectionRM" type="FaultDetection">
+        <id     property="id"            column="id"/>
+        <result property="analysisId"    column="analysis_id"/>
+        <result property="chargerId"     column="charger_id"/>
+        <result property="patternId"     column="pattern_id"/>
+        <result property="patternName"   column="pattern_name"/>
+        <result property="transactionId" column="transaction_id"/>
+        <result property="detectedAt"    column="detected_at"/>
+        <result property="triggerMsg"    column="trigger_msg"/>
+        <result property="followMsg"     column="follow_msg"/>
+        <result property="severity"      column="severity"/>
+        <result property="detail"        column="detail"/>
+    </resultMap>
+
+    <insert id="insertAll">
+        INSERT INTO fault_detection
+            (analysis_id, charger_id, pattern_id, transaction_id,
+             detected_at, trigger_msg, follow_msg, severity, detail)
+        VALUES
+        <foreach collection="list" item="d" separator=",">
+            (#{d.analysisId}, #{d.chargerId}, #{d.patternId}, #{d.transactionId},
+             NOW(), #{d.triggerMsg}, #{d.followMsg}, #{d.severity}, #{d.detail})
+        </foreach>
+    </insert>
+
+    <select id="findByAnalysisId" resultMap="detectionRM">
+        SELECT fd.*, fp.name AS pattern_name
+        FROM fault_detection fd
+        LEFT JOIN fault_pattern fp ON fd.pattern_id = fp.id
+        WHERE fd.analysis_id = #{analysisId}
+        ORDER BY fd.detected_at DESC
+    </select>
+
+    <select id="findByChargerId" resultMap="detectionRM">
+        SELECT fd.*, fp.name AS pattern_name
+        FROM fault_detection fd
+        LEFT JOIN fault_pattern fp ON fd.pattern_id = fp.id
+        WHERE fd.charger_id = #{chargerId}
+        ORDER BY fd.detected_at DESC
+    </select>
+
+    <select id="findRecent" resultMap="detectionRM">
+        SELECT fd.*, fp.name AS pattern_name
+        FROM fault_detection fd
+        LEFT JOIN fault_pattern fp ON fd.pattern_id = fp.id
+        ORDER BY fd.detected_at DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>
