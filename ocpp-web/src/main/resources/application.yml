@@ -1,5 +1,8 @@
 server:
   port: 7777
+  tomcat:
+    max-swallow-size: -1        # 업로드 실패 시 연결 끊기 방지 (-1 = 무제한)
+    max-http-form-post-size: -1 # POST 폼 데이터 최대 크기 (-1 = 무제한)
 
 spring:
   application:
@@ -29,8 +32,9 @@ spring:
   servlet:
     multipart:
       enabled: true
-      max-file-size: 100MB
-      max-request-size: 100MB
+      max-file-size: 1024MB
+      max-request-size: 1024MB
+      file-size-threshold: 2KB
 
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml

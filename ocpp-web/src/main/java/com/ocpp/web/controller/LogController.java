@@ -3,6 +3,8 @@ package com.ocpp.web.controller;
 import com.ocpp.web.client.EngineClient;
 import com.ocpp.web.dto.AnalysisResultDto;
 import com.ocpp.web.dto.AnalyzeRequestDto;
+import com.ocpp.web.dto.FlowViolationDto;
+import com.ocpp.web.service.FlowViolationService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -48,6 +51,7 @@ import java.util.stream.Stream;
 public class LogController {
 
     private final EngineClient engineClient;
+    private final FlowViolationService flowViolationService;
 
     @Value("${ocpp.log.upload-dir}")
     private String uploadDirConfig;
@@ -141,8 +145,15 @@ public class LogController {
      * → URL을 북마크하거나 새로고침해도 항상 동일한 결과 표시
      * ─────────────────────────────────────────────────── */
     @GetMapping("/result/{sessionId}")
-    public String result(@PathVariable String sessionId, Model model) {
+    public String result(@PathVariable String sessionId,
+                         @RequestParam(defaultValue = "") String vTransactionId,
+                         @RequestParam(defaultValue = "") String vChargerId,
+                         @RequestParam(defaultValue = "") String vSeverity,
+                         Model model) {
         model.addAttribute("currentMenu", "log");
+        model.addAttribute("vTransactionId", vTransactionId);
+        model.addAttribute("vChargerId",     vChargerId);
+        model.addAttribute("vSeverity",      vSeverity);
         try {
             AnalysisResultDto result = engineClient.getResultBySessionId(sessionId);
             if (result == null) {
@@ -150,13 +161,25 @@ public class LogController {
                 return "log/result";
             }
 
-            // 파일 URL 재구성 (결과 화면에 링크 표시용)
             String encodedFileName = URLEncoder.encode(result.getFileName() != null
                     ? FILE_PREFIX + sessionId + getExtFromFileName(result.getFileName())
                     : FILE_PREFIX + sessionId + ".txt", StandardCharsets.UTF_8);
 
             model.addAttribute("result",  result);
             model.addAttribute("fileUrl", "/log/upload/" + encodedFileName);
+
+            // 흐름 위반 목록 조회 — 검색 조건 적용
+            try {
+                List<FlowViolationDto> violations = flowViolationService.search(
+                        sessionId, vTransactionId, vChargerId, vSeverity);
+                int totalViolations = flowViolationService.countBySessionId(sessionId);
+                model.addAttribute("violations",      violations);
+                model.addAttribute("totalViolations", totalViolations);
+            } catch (Exception ve) {
+                log.warn("[LogController] 흐름 위반 조회 실패 - sessionId={}, error={}", sessionId, ve.getMessage());
+                model.addAttribute("violations",      List.of());
+                model.addAttribute("totalViolations", 0);
+            }
 
         } catch (Exception e) {
             log.error("[LogController] 결과 조회 실패 - sessionId={}", sessionId, e);

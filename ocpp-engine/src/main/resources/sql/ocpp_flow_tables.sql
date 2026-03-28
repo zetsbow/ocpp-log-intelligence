@@ -36,20 +36,25 @@ ALTER TABLE transaction_detail
 UPDATE transaction_detail SET is_fault = 'Y' WHERE is_fault = '1';
 UPDATE transaction_detail SET is_fault = 'N' WHERE is_fault = '0';
 UPDATE transaction_detail SET is_fault = 'N' WHERE is_fault IS NULL OR is_fault = '';
-
+ㅈ
 -- KEVIT 충전 흐름 위반 이슈 테이블 (세션 ID 기반)
 DROP TABLE IF EXISTS flow_violation;
 CREATE TABLE IF NOT EXISTS flow_violation (
     id             BIGINT        NOT NULL AUTO_INCREMENT,
     session_id     VARCHAR(50),
+    message_id     VARCHAR(100),
     transaction_id VARCHAR(50),
     charger_id     VARCHAR(50),
     severity       VARCHAR(10),
-    log_timestamp  VARCHAR(20),
+    log_timestamp  VARCHAR(30),
     message        VARCHAR(1000),
     PRIMARY KEY (id),
     KEY idx_session_id (session_id)
 );
+
+-- 기존 테이블에 message_id 컬럼이 없는 경우 추가
+ALTER TABLE flow_violation
+    ADD COLUMN IF NOT EXISTS message_id VARCHAR(100) AFTER session_id;
 
 -- ============================================================
 --  기존 DB 컬럼 확장 (이미 테이블이 있는 경우 반드시 실행)
