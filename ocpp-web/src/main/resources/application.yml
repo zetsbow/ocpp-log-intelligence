@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 7777
 
 spring:
   application:
@@ -31,7 +31,7 @@ mybatis:
     default-statement-timeout: 30
 
 engine:
-  url: http://localhost:8081
+  url: http://localhost:7778
 
 logging:
   level:

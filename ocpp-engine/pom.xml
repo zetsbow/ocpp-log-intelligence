@@ -12,7 +12,6 @@
 
     <artifactId>ocpp-engine</artifactId>
     <packaging>jar</packaging>
-    <n>OCPP Engine - Analysis Module</n>
 
     <dependencies>
         <dependency>
