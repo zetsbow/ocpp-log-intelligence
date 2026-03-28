@@ -27,13 +27,12 @@ mybatis:
 
 ocpp:
   log:
-    # web과 동일 서버이므로 같은 상대경로 사용
-    # engine 실행 위치/logs/upload → web의 저장 경로와 일치시켜야 함
-    # 운영 배포 시 두 모듈을 같은 디렉토리에서 실행하거나
-    # 절대 경로로 맞춰주면 됨 (아래 주석 참고)
     upload-dir: ./logs/upload
-    # 절대 경로 예시 (운영 서버 배포 시):
-    # upload-dir: /home/ocpp/app/logs/upload
+  web:
+    # 파일 다운로드 시 사용하는 ocpp-web 서버 base URL
+    # 동일 서버 배포 시: http://127.0.0.1:7777
+    # 서버 분리 배포 시: http://실제서버IP:7777
+    base-url: http://127.0.0.1:7777
 
 logging:
   level:

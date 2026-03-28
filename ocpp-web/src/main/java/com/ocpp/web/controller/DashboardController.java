@@ -2,11 +2,13 @@ package com.ocpp.web.controller;
 
 import com.ocpp.web.client.EngineClient;
 import com.ocpp.web.dto.AnalysisResultDto;
+import com.ocpp.web.dto.OcppFlowEntryDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
@@ -45,5 +47,21 @@ public class DashboardController {
             model.addAttribute("engineError", true);
         }
         return "dashboard/index";
+    }
+
+    @GetMapping("/dashboard/detail/{sessionId}")
+    public String detail(@PathVariable String sessionId, Model model) {
+        model.addAttribute("currentMenu", "dashboard");
+        model.addAttribute("sessionId", sessionId);
+        try {
+            AnalysisResultDto result = engineClient.getResultBySessionId(sessionId);
+            List<OcppFlowEntryDto> details = engineClient.getTransactionDetail(sessionId);
+            model.addAttribute("result", result);
+            model.addAttribute("details", details);
+        } catch (Exception e) {
+            log.warn("상세 조회 실패 - sessionId={}, error={}", sessionId, e.getMessage());
+            model.addAttribute("engineError", true);
+        }
+        return "dashboard/detail";
     }
 }

@@ -2,69 +2,263 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{fragments/layout}">
-<head><title>대시보드 - OCPP Analyzer</title></head>
+<head>
+  <title>대시보드 - OCPP Analyzer</title>
+  <style>
+    /* ── KPI 카드 ─────────────────────────────────── */
+    .kpi-card {
+      border: none;
+      border-radius: 16px;
+      padding: 1.4rem 1.6rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+    .kpi-card .kpi-icon {
+      position: absolute; right: 1.2rem; top: 1.2rem;
+      font-size: 2.4rem; opacity: .18;
+    }
+    .kpi-card .kpi-label { font-size: .78rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; margin-bottom: .3rem; }
+    .kpi-card .kpi-value { font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+    .kpi-card .kpi-sub   { font-size: .78rem; margin-top: .35rem; opacity: .75; }
+
+    .kpi-blue   { background: linear-gradient(135deg, #1565c0 0%, #1e88e5 100%); color: #fff; }
+    .kpi-teal   { background: linear-gradient(135deg, #00695c 0%, #00acc1 100%); color: #fff; }
+    .kpi-red    { background: linear-gradient(135deg, #b71c1c 0%, #e53935 100%); color: #fff; }
+    .kpi-purple { background: linear-gradient(135deg, #4527a0 0%, #7c4dff 100%); color: #fff; }
+
+    /* ── 차트 카드 ─────────────────────────────────── */
+    .chart-card {
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .chart-card .card-header {
+      background: transparent;
+      border-bottom: 1px solid rgba(0,0,0,.07);
+      border-radius: 16px 16px 0 0 !important;
+      padding: 1rem 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .chart-card .chart-title { font-size: .95rem; font-weight: 700; color: #1a237e; }
+    .chart-legend { display: flex; gap: 16px; font-size: .78rem; }
+    .chart-legend span { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── 테이블 ─────────────────────────────────────── */
+    .history-card {
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+      overflow: hidden;
+    }
+    .history-card .card-header {
+      background: #fff;
+      border-bottom: 1px solid rgba(0,0,0,.07);
+      padding: 1rem 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .history-card .card-header .title { font-size: .95rem; font-weight: 700; color: #1a237e; }
+    .history-card table th {
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #78909c;
+      font-weight: 600;
+      background: #f8fafc;
+      border-bottom: 2px solid #e8eaf6;
+      padding: .75rem 1rem;
+      white-space: nowrap;
+    }
+    .history-card table td {
+      font-size: .85rem;
+      padding: .75rem 1rem;
+      vertical-align: middle;
+      border-bottom: 1px solid #f0f0f0;
+      color: #37474f;
+    }
+    .history-card table tr:last-child td { border-bottom: none; }
+    .history-card table tr:hover td { background: #f5f7ff; }
+
+    .session-badge {
+      display: inline-block;
+      background: #e8eaf6;
+      color: #3949ab;
+      font-family: 'Courier New', monospace;
+      font-size: .78rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: .04em;
+    }
+    .fault-badge-ok   { background: #e8f5e9; color: #2e7d32; font-size: .78rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+    .fault-badge-err  { background: #ffebee; color: #c62828; font-size: .78rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+    .type-badge { background: #ede7f6; color: #4527a0; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+
+    /* ── 페이지 헤더 ─────────────────────────────────── */
+    .page-header { margin-bottom: 1.8rem; }
+    .page-header h4 { font-size: 1.4rem; font-weight: 800; color: #1a237e; margin: 0; }
+    .page-header .sub { font-size: .83rem; color: #90a4ae; margin-top: .2rem; }
+
+    /* ── 빈 상태 ─────────────────────────────────────── */
+    .empty-state { padding: 3rem 0; text-align: center; color: #b0bec5; }
+    .empty-state i { font-size: 2.5rem; margin-bottom: .8rem; display: block; }
+    .empty-state p { font-size: .9rem; }
+
+    /* ── 알림 배너 ───────────────────────────────────── */
+    .engine-alert {
+      border: none;
+      border-radius: 12px;
+      background: #fff3e0;
+      color: #e65100;
+      padding: .9rem 1.2rem;
+      font-size: .88rem;
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── 새 분석 버튼 ───────────────────────────────── */
+    .btn-new-analysis {
+      background: linear-gradient(135deg, #1565c0, #1e88e5);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: .42rem 1rem;
+      font-size: .82rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      text-decoration: none;
+      transition: opacity .2s;
+    }
+    .btn-new-analysis:hover { opacity: .88; color: #fff; }
+  </style>
+</head>
 
 <th:block layout:fragment="content">
 
-  <h4 class="mb-4 fw-bold"><i class="bi bi-speedometer2 text-success me-2"></i>대시보드</h4>
+  <!-- 페이지 헤더 -->
+  <div class="page-header d-flex align-items-center justify-content-between">
+    <div>
+      <h4><i class="bi bi-speedometer2 me-2"></i>대시보드</h4>
+      <div class="sub">OCPP 로그 분석 현황을 한눈에 확인합니다</div>
+    </div>
+    <a th:href="@{/log}" class="btn-new-analysis">
+      <i class="bi bi-plus-lg"></i> 새 분석
+    </a>
+  </div>
 
   <!-- 엔진 연결 오류 -->
-  <div th:if="${engineError}" class="alert alert-warning">
-    <i class="bi bi-exclamation-triangle me-2"></i>
-    ocpp-engine(7778)에 연결할 수 없습니다. 엔진 서버를 먼저 기동해주세요.
+  <div th:if="${engineError}" class="engine-alert">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    ocpp-engine(7778) 에 연결할 수 없습니다. 엔진 서버를 먼저 기동해주세요.
   </div>
 
-  <!-- 요약 카드 3개 -->
+  <!-- KPI 카드 4개 -->
   <div class="row g-3 mb-4">
-    <div class="col-md-4">
-      <div class="card p-3">
-        <div class="text-muted small">총 분석 이력</div>
-        <div class="fs-2 fw-bold text-primary" th:text="${historyCount} ?: 0">0</div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="kpi-card kpi-blue">
+        <i class="bi bi-clipboard-data kpi-icon"></i>
+        <div class="kpi-label">총 분석 이력</div>
+        <div class="kpi-value" th:text="${historyCount} ?: 0">0</div>
+        <div class="kpi-sub">누적 분석 세션 수</div>
       </div>
     </div>
-    <div class="col-md-4">
-      <div class="card p-3">
-        <div class="text-muted small">총 트랜잭션</div>
-        <div class="fs-2 fw-bold text-info" th:text="${totalTransaction} ?: 0">0</div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="kpi-card kpi-teal">
+        <i class="bi bi-lightning-charge kpi-icon"></i>
+        <div class="kpi-label">전체 트랜잭션</div>
+        <div class="kpi-value" th:text="${totalTransaction} ?: 0">0</div>
+        <div class="kpi-sub">분석된 OCPP 전문 수</div>
       </div>
     </div>
-    <div class="col-md-4">
-      <div class="card p-3">
-        <div class="text-muted small">총 장애 트랜잭션</div>
-        <div class="fs-2 fw-bold text-danger" th:text="${totalFaultTransaction} ?: 0">0</div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="kpi-card kpi-red">
+        <i class="bi bi-bug kpi-icon"></i>
+        <div class="kpi-label">장애 트랜잭션</div>
+        <div class="kpi-value" th:text="${totalFaultTransaction} ?: 0">0</div>
+        <div class="kpi-sub">패턴 매칭 탐지 건수</div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="kpi-card kpi-purple">
+        <i class="bi bi-shield-check kpi-icon"></i>
+        <div class="kpi-label">장애율</div>
+        <div class="kpi-value"
+             th:text="${totalTransaction != null and totalTransaction > 0}
+                       ? ${#numbers.formatDecimal(totalFaultTransaction * 100.0 / totalTransaction, 1, 1)} + '%'
+                       : '0%'">0%</div>
+        <div class="kpi-sub">장애 트랜잭션 비율</div>
       </div>
     </div>
   </div>
 
-  <!-- 차트 -->
-  <div class="card mb-4" th:if="${history != null and !history.isEmpty()}">
-    <div class="card-header">최근 분석 이력 — 장애 트랜잭션 추이</div>
-    <div class="card-body">
-      <canvas id="faultChart" height="80"></canvas>
+  <!-- 차트 영역 (2단) -->
+  <div class="row g-3 mb-4" th:if="${history != null and !history.isEmpty()}">
+
+    <!-- 메인 차트: 트랜잭션 추이 -->
+    <div class="col-xl-8">
+      <div class="chart-card card h-100">
+        <div class="card-header">
+          <span class="chart-title"><i class="bi bi-bar-chart-line me-2"></i>분석 이력 — 트랜잭션 추이</span>
+          <div class="chart-legend">
+            <span><span class="legend-dot" style="background:#3949ab"></span>전체 트랜잭션</span>
+            <span><span class="legend-dot" style="background:#e53935"></span>장애 트랜잭션</span>
+          </div>
+        </div>
+        <div class="card-body" style="padding:1.2rem">
+          <canvas id="trendChart" style="max-height:220px"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- 도넛 차트: 정상 vs 장애 비율 -->
+    <div class="col-xl-4">
+      <div class="chart-card card h-100">
+        <div class="card-header">
+          <span class="chart-title"><i class="bi bi-pie-chart me-2"></i>정상 / 장애 비율</span>
+        </div>
+        <div class="card-body d-flex flex-column align-items-center justify-content-center" style="padding:1.2rem">
+          <canvas id="donutChart" style="max-height:180px;max-width:180px"></canvas>
+          <div class="d-flex gap-3 mt-3" style="font-size:.8rem">
+            <span><span class="legend-dot d-inline-block me-1" style="background:#3949ab;width:10px;height:10px;border-radius:50%"></span>정상</span>
+            <span><span class="legend-dot d-inline-block me-1" style="background:#e53935;width:10px;height:10px;border-radius:50%"></span>장애</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- 분석 이력 테이블 -->
-  <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <span>분석 이력</span>
-      <a th:href="@{/log}" class="btn btn-sm btn-success">
-        <i class="bi bi-plus"></i> 새 분석
-      </a>
+  <div class="history-card">
+    <div class="card-header">
+      <span class="title"><i class="bi bi-table me-2"></i>분석 이력</span>
+      <span class="text-muted" style="font-size:.8rem" th:text="'최근 ' + ${historyCount} + '건'"></span>
     </div>
-    <div class="card-body p-0">
-      <div th:if="${history == null or history.isEmpty()}" class="text-center text-muted py-5">
-        분석 이력이 없습니다.
-      </div>
-      <table class="table table-hover mb-0" th:if="${history != null and !history.isEmpty()}">
-        <thead class="table-light">
+
+    <div th:if="${history == null or history.isEmpty()}" class="empty-state">
+      <i class="bi bi-inbox"></i>
+      <p>분석 이력이 없습니다.<br><a th:href="@{/log}">로그를 업로드</a>하여 첫 분석을 시작하세요.</p>
+    </div>
+
+    <div class="table-responsive" th:if="${history != null and !history.isEmpty()}">
+      <table class="table mb-0">
+        <thead>
           <tr>
             <th>세션 ID</th>
             <th>분석 일시</th>
-            <th>충전기 ID</th>
+            <th>충전기</th>
             <th>파일명</th>
-            <th>트랜잭션</th>
-            <th>장애</th>
+            <th style="text-align:right">전체</th>
+            <th style="text-align:right">장애</th>
             <th>유형</th>
             <th>요약</th>
           </tr>
@@ -72,24 +266,32 @@
         <tbody>
           <tr th:each="h : ${history}">
             <td>
-              <span class="badge bg-secondary font-monospace"
-                    th:text="${h.sessionId} ?: '-'">-</span>
+              <a th:href="@{/dashboard/detail/{id}(id=${h.sessionId})}"
+                 class="session-badge"
+                 style="cursor:pointer;text-decoration:none"
+                 th:text="${h.sessionId} ?: '-'">-</a>
             </td>
-            <td th:text="${#temporals.format(h.analyzedAt,'MM-dd HH:mm')}">-</td>
-            <td><code th:text="${h.chargerId} ?: '전체'">-</code></td>
-            <td class="text-truncate" style="max-width:160px"
-                th:text="${h.fileName} ?: '-'">-</td>
-            <td th:text="${h.totalTransaction}">0</td>
+            <td style="white-space:nowrap"
+                th:text="${#temporals.format(h.analyzedAt,'yy-MM-dd HH:mm')}">-</td>
             <td>
-              <span class="badge"
-                    th:classappend="${h.faultTransactionCount > 0 ? 'bg-danger' : 'bg-success'}"
+              <code style="font-size:.8rem;color:#5c6bc0"
+                    th:text="${h.chargerId} ?: '전체'">-</code>
+            </td>
+            <td class="text-truncate" style="max-width:180px;font-size:.82rem"
+                th:text="${h.fileName} ?: '-'">-</td>
+            <td style="text-align:right;font-weight:600"
+                th:text="${h.totalTransaction}">0</td>
+            <td style="text-align:right">
+              <span th:if="${h.faultTransactionCount == 0}" class="fault-badge-ok"
+                    th:text="${h.faultTransactionCount}">0</span>
+              <span th:if="${h.faultTransactionCount > 0}" class="fault-badge-err"
                     th:text="${h.faultTransactionCount}">0</span>
             </td>
             <td>
-              <span class="badge bg-secondary" th:text="${h.analysisType}">-</span>
+              <span class="type-badge" th:text="${h.analysisType}">-</span>
             </td>
-            <td class="text-truncate text-muted small"
-                style="max-width:200px" th:text="${h.summary}">-</td>
+            <td class="text-truncate" style="max-width:220px;font-size:.78rem;color:#90a4ae"
+                th:text="${h.summary}">-</td>
           </tr>
         </tbody>
       </table>
@@ -99,32 +301,120 @@
 </th:block>
 
 <th:block layout:fragment="script">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script th:inline="javascript">
   const history = /*[[${history}]]*/ [];
+
   if (history && history.length > 0) {
-    const labels = history.slice(0,10).reverse()
-        .map(h => h.sessionId || (h.analyzedAt ? h.analyzedAt.substring(5,16) : '-'));
-    const faults = history.slice(0,10).reverse().map(h => h.faultTransactionCount || 0);
-    const totals = history.slice(0,10).reverse().map(h => h.totalTransaction || 0);
-    new Chart(document.getElementById('faultChart'), {
-      type: 'bar',
+    const recent = history.slice(0, 10).reverse();
+    const labels  = recent.map(h => h.sessionId || '-');
+    const totals  = recent.map(h => h.totalTransaction || 0);
+    const faults  = recent.map(h => h.faultTransactionCount || 0);
+    const normals = recent.map((h, i) => (h.totalTransaction || 0) - (h.faultTransactionCount || 0));
+
+    // ── 트렌드 차트 (혼합: 막대 + 라인) ──────────────
+    new Chart(document.getElementById('trendChart'), {
       data: {
         labels,
         datasets: [
-          { label: '장애 트랜잭션', data: faults,
-            backgroundColor: 'rgba(220,53,69,.7)', yAxisID: 'y' },
-          { label: '전체 트랜잭션', data: totals,
-            type: 'line', borderColor: '#0dcaf0',
-            backgroundColor: 'transparent', yAxisID: 'y1', tension: 0.3 }
+          {
+            type: 'bar',
+            label: '정상 트랜잭션',
+            data: normals,
+            backgroundColor: 'rgba(57,73,171,.75)',
+            borderRadius: 6,
+            borderSkipped: false,
+            yAxisID: 'y'
+          },
+          {
+            type: 'bar',
+            label: '장애 트랜잭션',
+            data: faults,
+            backgroundColor: 'rgba(229,57,53,.8)',
+            borderRadius: 6,
+            borderSkipped: false,
+            yAxisID: 'y'
+          },
+          {
+            type: 'line',
+            label: '전체 트랜잭션',
+            data: totals,
+            borderColor: '#00acc1',
+            backgroundColor: 'rgba(0,172,193,.1)',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#00acc1',
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            fill: true,
+            tension: 0.4,
+            yAxisID: 'y'
+          }
         ]
       },
       options: {
         responsive: true,
+        maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a237e',
+            titleColor: '#fff',
+            bodyColor: 'rgba(255,255,255,.85)',
+            padding: 12,
+            cornerRadius: 8,
+            displayColors: true
+          }
+        },
         scales: {
-          y:  { beginAtZero: true, title: { display: true, text: '장애 트랜잭션' } },
-          y1: { beginAtZero: true, position: 'right',
-                title: { display: true, text: '전체 트랜잭션' },
-                grid: { drawOnChartArea: false } }
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, color: '#90a4ae' }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(0,0,0,.05)' },
+            ticks: { font: { size: 11 }, color: '#90a4ae', stepSize: 1 }
+          }
+        }
+      }
+    });
+
+    // ── 도넛 차트 ─────────────────────────────────────
+    const totalAll  = totals.reduce((a, b) => a + b, 0);
+    const faultAll  = faults.reduce((a, b) => a + b, 0);
+    const normalAll = totalAll - faultAll;
+
+    new Chart(document.getElementById('donutChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['정상', '장애'],
+        datasets: [{
+          data: [normalAll, faultAll],
+          backgroundColor: ['#3949ab', '#e53935'],
+          hoverBackgroundColor: ['#1a237e', '#b71c1c'],
+          borderWidth: 0,
+          spacing: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        cutout: '72%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a237e',
+            titleColor: '#fff',
+            bodyColor: 'rgba(255,255,255,.85)',
+            padding: 10,
+            cornerRadius: 8,
+            callbacks: {
+              label: ctx => {
+                const pct = totalAll > 0 ? (ctx.parsed / totalAll * 100).toFixed(1) : 0;
+                return ` ${ctx.label}: ${ctx.parsed}건 (${pct}%)`;
+              }
+            }
+          }
         }
       }
     });
