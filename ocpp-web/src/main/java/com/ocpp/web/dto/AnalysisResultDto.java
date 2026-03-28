@@ -7,13 +7,16 @@ import java.util.List;
 
 @Data
 public class AnalysisResultDto {
-    private Long id;
-    private String chargerId;
+
+    /** 분석 세션 ID (PK, CHAR(13)) — 예: 20260328-0001 */
+    private String        sessionId;
+
+    private String        chargerId;
     private LocalDateTime analyzedAt;
-    private int totalMsgCount;
-    private int faultCount;
-    private String analysisType;
-    private String fileName;
-    private String summary;
+    private int           totalTransaction;
+    private int           faultTransactionCount;
+    private String        analysisType;
+    private String        fileName;
+    private String        summary;
     private List<FaultDetectionDto> detections;
 }

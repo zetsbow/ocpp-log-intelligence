@@ -11,7 +11,7 @@
   <!-- 엔진 연결 오류 -->
   <div th:if="${engineError}" class="alert alert-warning">
     <i class="bi bi-exclamation-triangle me-2"></i>
-    ocpp-engine(8081)에 연결할 수 없습니다. 엔진 서버를 먼저 기동해주세요.
+    ocpp-engine(7778)에 연결할 수 없습니다. 엔진 서버를 먼저 기동해주세요.
   </div>
 
   <!-- 요약 카드 3개 -->
@@ -24,21 +24,21 @@
     </div>
     <div class="col-md-4">
       <div class="card p-3">
-        <div class="text-muted small">총 분석 메시지</div>
-        <div class="fs-2 fw-bold text-info" th:text="${totalMsgs} ?: 0">0</div>
+        <div class="text-muted small">총 트랜잭션</div>
+        <div class="fs-2 fw-bold text-info" th:text="${totalTransaction} ?: 0">0</div>
       </div>
     </div>
     <div class="col-md-4">
       <div class="card p-3">
-        <div class="text-muted small">총 탐지 장애</div>
-        <div class="fs-2 fw-bold text-danger" th:text="${totalFaults} ?: 0">0</div>
+        <div class="text-muted small">총 장애 트랜잭션</div>
+        <div class="fs-2 fw-bold text-danger" th:text="${totalFaultTransaction} ?: 0">0</div>
       </div>
     </div>
   </div>
 
   <!-- 차트 -->
   <div class="card mb-4" th:if="${history != null and !history.isEmpty()}">
-    <div class="card-header">최근 분석 이력 — 장애 건수 추이</div>
+    <div class="card-header">최근 분석 이력 — 장애 트랜잭션 추이</div>
     <div class="card-body">
       <canvas id="faultChart" height="80"></canvas>
     </div>
@@ -48,7 +48,9 @@
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
       <span>분석 이력</span>
-      <a th:href="@{/log}" class="btn btn-sm btn-success"><i class="bi bi-plus"></i> 새 분석</a>
+      <a th:href="@{/log}" class="btn btn-sm btn-success">
+        <i class="bi bi-plus"></i> 새 분석
+      </a>
     </div>
     <div class="card-body p-0">
       <div th:if="${history == null or history.isEmpty()}" class="text-center text-muted py-5">
@@ -57,10 +59,11 @@
       <table class="table table-hover mb-0" th:if="${history != null and !history.isEmpty()}">
         <thead class="table-light">
           <tr>
+            <th>세션 ID</th>
             <th>분석 일시</th>
             <th>충전기 ID</th>
             <th>파일명</th>
-            <th>메시지 수</th>
+            <th>트랜잭션</th>
             <th>장애</th>
             <th>유형</th>
             <th>요약</th>
@@ -68,18 +71,25 @@
         </thead>
         <tbody>
           <tr th:each="h : ${history}">
+            <td>
+              <span class="badge bg-secondary font-monospace"
+                    th:text="${h.sessionId} ?: '-'">-</span>
+            </td>
             <td th:text="${#temporals.format(h.analyzedAt,'MM-dd HH:mm')}">-</td>
             <td><code th:text="${h.chargerId} ?: '전체'">-</code></td>
-            <td class="text-truncate" style="max-width:160px" th:text="${h.fileName} ?: '-'">-</td>
-            <td th:text="${h.totalMsgCount}">0</td>
+            <td class="text-truncate" style="max-width:160px"
+                th:text="${h.fileName} ?: '-'">-</td>
+            <td th:text="${h.totalTransaction}">0</td>
             <td>
-              <span class="badge" th:classappend="${h.faultCount > 0 ? 'bg-danger' : 'bg-success'}"
-                    th:text="${h.faultCount}">0</span>
+              <span class="badge"
+                    th:classappend="${h.faultTransactionCount > 0 ? 'bg-danger' : 'bg-success'}"
+                    th:text="${h.faultTransactionCount}">0</span>
             </td>
             <td>
               <span class="badge bg-secondary" th:text="${h.analysisType}">-</span>
             </td>
-            <td class="text-truncate text-muted small" style="max-width:200px" th:text="${h.summary}">-</td>
+            <td class="text-truncate text-muted small"
+                style="max-width:200px" th:text="${h.summary}">-</td>
           </tr>
         </tbody>
       </table>
@@ -92,24 +102,28 @@
 <script th:inline="javascript">
   const history = /*[[${history}]]*/ [];
   if (history && history.length > 0) {
-    const labels  = history.slice(0,10).reverse().map(h => h.analyzedAt ? h.analyzedAt.substring(5,16) : '-');
-    const faults  = history.slice(0,10).reverse().map(h => h.faultCount || 0);
-    const msgs    = history.slice(0,10).reverse().map(h => h.totalMsgCount || 0);
+    const labels = history.slice(0,10).reverse()
+        .map(h => h.sessionId || (h.analyzedAt ? h.analyzedAt.substring(5,16) : '-'));
+    const faults = history.slice(0,10).reverse().map(h => h.faultTransactionCount || 0);
+    const totals = history.slice(0,10).reverse().map(h => h.totalTransaction || 0);
     new Chart(document.getElementById('faultChart'), {
       type: 'bar',
       data: {
         labels,
         datasets: [
-          { label: '장애 건수', data: faults, backgroundColor: 'rgba(220,53,69,.7)', yAxisID: 'y' },
-          { label: '총 메시지', data: msgs, type: 'line', borderColor: '#0dcaf0',
+          { label: '장애 트랜잭션', data: faults,
+            backgroundColor: 'rgba(220,53,69,.7)', yAxisID: 'y' },
+          { label: '전체 트랜잭션', data: totals,
+            type: 'line', borderColor: '#0dcaf0',
             backgroundColor: 'transparent', yAxisID: 'y1', tension: 0.3 }
         ]
       },
       options: {
         responsive: true,
         scales: {
-          y:  { beginAtZero: true, title: { display: true, text: '장애 건수' } },
-          y1: { beginAtZero: true, position: 'right', title: { display: true, text: '메시지 수' },
+          y:  { beginAtZero: true, title: { display: true, text: '장애 트랜잭션' } },
+          y1: { beginAtZero: true, position: 'right',
+                title: { display: true, text: '전체 트랜잭션' },
                 grid: { drawOnChartArea: false } }
         }
       }

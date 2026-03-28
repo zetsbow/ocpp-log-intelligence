@@ -17,20 +17,6 @@ mvnw.cmd
 *.iml
 *.ipr
 out/
-.idea/modules.xml
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/dictionaries
-.idea/vcs.xml
-.idea/jsLibraryMappings.xml
-.idea/datasources.xml
-.idea/dataSources.ids
-.idea/sqlDataSources.xml
-.idea/dynamic.xml
-.idea/uiDesigner.xml
-.idea/gradle.xml
-.idea/libraries
-.idea/shelf
 
 # ── Spring Boot ──────────────────────────────────────────────
 **/application-local.yml
@@ -47,18 +33,15 @@ secrets.properties
 *.p12
 *.jks
 
-# ── 로그 파일 ────────────────────────────────────────────────
-*.log
-logs/
-log/
-/ocpp-web/logs/
-/ocpp-engine/logs/
+# ── 업로드 로그 파일 ──────────────────────────────────────────
+# logs/upload 폴더 안의 모든 파일 제외
+# 단, 디렉토리 구조 유지를 위한 .gitkeep은 예외
+**/logs/upload/*
+!**/logs/upload/.gitkeep
 
-# ── OCPP 로그 샘플 (민감 데이터 포함 가능) ──────────────────────
-/sample-logs/
-*.ocpp
-/ocpp-web/src/main/resources/logs/
-/ocpp-engine/src/main/resources/logs/
+# ── 애플리케이션 로그 ─────────────────────────────────────────
+*.log
+log/
 
 # ── OS 파일 ──────────────────────────────────────────────────
 .DS_Store
@@ -93,11 +76,9 @@ bin/
 *.swp
 *~.nib
 
-# ── Node (Thymeleaf 개발시 npm 사용 경우 대비) ────────────────
+# ── Node ────────────────────────────────────────────────────
 node_modules/
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # ── 로컬 DB 덤프 ────────────────────────────────────────────
 *.sql.bak

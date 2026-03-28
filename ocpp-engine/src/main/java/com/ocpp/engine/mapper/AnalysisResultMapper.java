@@ -11,5 +11,5 @@ public interface AnalysisResultMapper {
     void insert(AnalysisResult result);
     List<AnalysisResult> findRecent(@Param("limit") int limit);
     List<AnalysisResult> findAll();
-    AnalysisResult findById(@Param("id") Long id);
+    AnalysisResult findById(@Param("sessionId") String sessionId);
 }
