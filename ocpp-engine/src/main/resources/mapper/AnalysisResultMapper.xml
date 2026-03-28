@@ -4,22 +4,26 @@
 <mapper namespace="com.ocpp.engine.mapper.AnalysisResultMapper">
 
     <resultMap id="resultRM" type="AnalysisResult">
-        <id     property="id"            column="id"/>
-        <result property="chargerId"     column="charger_id"/>
-        <result property="analyzedAt"    column="analyzed_at"/>
-        <result property="totalMsgCount" column="total_msg_count"/>
-        <result property="faultCount"    column="fault_count"/>
-        <result property="analysisType"  column="analysis_type"/>
-        <result property="fileName"      column="file_name"/>
-        <result property="summary"       column="summary"/>
+        <id     property="sessionId"             column="session_id"/>
+        <result property="logKey"                column="log_key"/>
+        <result property="chargerId"             column="charger_id"/>
+        <result property="analyzedAt"            column="analyzed_at"/>
+        <result property="totalTransaction"      column="total_transaction"/>
+        <result property="faultTransactionCount" column="fault_transaction_count"/>
+        <result property="analysisType"          column="analysis_type"/>
+        <result property="fileName"              column="file_name"/>
+        <result property="summary"               column="summary"/>
     </resultMap>
 
-    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    <!-- session_id는 서비스에서 직접 생성하여 삽입 (AUTO_INCREMENT 아님) -->
+    <insert id="insert">
         INSERT INTO analysis_result
-            (charger_id, analyzed_at, total_msg_count, fault_count,
+            (session_id, log_key, charger_id, analyzed_at,
+             total_transaction, fault_transaction_count,
              analysis_type, file_name, summary)
         VALUES
-            (#{chargerId}, NOW(), #{totalMsgCount}, #{faultCount},
+            (#{sessionId}, #{logKey}, #{chargerId}, NOW(),
+             #{totalTransaction}, #{faultTransactionCount},
              #{analysisType}, #{fileName}, #{summary})
     </insert>
 
@@ -30,11 +34,13 @@
     </select>
 
     <select id="findAll" resultMap="resultRM">
-        SELECT * FROM analysis_result ORDER BY analyzed_at DESC
+        SELECT * FROM analysis_result
+        ORDER BY analyzed_at DESC
     </select>
 
     <select id="findById" resultMap="resultRM">
-        SELECT * FROM analysis_result WHERE id = #{id}
+        SELECT * FROM analysis_result
+        WHERE session_id = #{sessionId}
     </select>
 
 </mapper>

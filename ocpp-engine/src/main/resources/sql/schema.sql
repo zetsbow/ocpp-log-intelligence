@@ -20,21 +20,24 @@ CREATE TABLE IF NOT EXISTS fault_pattern (
 ) ENGINE=InnoDB COMMENT='장애 패턴 등록 테이블';
 
 -- 기능1: 정기 분석 이력
+-- session_id: AUTO_INCREMENT PK (분석 세션 식별자)
+-- log_key   : 파일명에서 추출한 키 (예: OCPP-LOG-ANALYSIS-20260328-0001.txt → 20260328-0001)
 CREATE TABLE IF NOT EXISTS analysis_result (
-    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-    charger_id      VARCHAR(100)           COMMENT '충전기 ID (NULL이면 전체 배치)',
-    analyzed_at     DATETIME      NOT NULL DEFAULT NOW(),
-    total_msg_count INT           NOT NULL DEFAULT 0,
-    fault_count     INT           NOT NULL DEFAULT 0,
-    analysis_type   ENUM('BATCH','MANUAL') NOT NULL DEFAULT 'BATCH',
-    file_name       VARCHAR(500)           COMMENT '분석 대상 파일명',
-    summary         TEXT                   COMMENT '분석 요약'
+    session_id               BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '분석 세션 ID',
+    log_key                  VARCHAR(100)           COMMENT '로그 파일 키 (예: 20260328-0001)',
+    charger_id               VARCHAR(100)           COMMENT '충전기 ID (NULL이면 전체 배치)',
+    analyzed_at              DATETIME      NOT NULL DEFAULT NOW(),
+    total_transaction        INT           NOT NULL DEFAULT 0  COMMENT '전체 트랜잭션 수',
+    fault_transaction_count  INT           NOT NULL DEFAULT 0  COMMENT '장애 트랜잭션 수',
+    analysis_type            ENUM('BATCH','MANUAL') NOT NULL DEFAULT 'BATCH',
+    file_name                VARCHAR(500)           COMMENT '분석 대상 파일명',
+    summary                  TEXT                   COMMENT '분석 요약'
 ) ENGINE=InnoDB COMMENT='분석 이력 테이블';
 
 -- 기능2: 탐지된 장애
 CREATE TABLE IF NOT EXISTS fault_detection (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-    analysis_id     BIGINT                 COMMENT '분석 이력 FK',
+    analysis_id     BIGINT                 COMMENT '분석 이력 FK (analysis_result.session_id)',
     charger_id      VARCHAR(100)  NOT NULL,
     pattern_id      BIGINT                 COMMENT '매칭된 패턴 FK',
     transaction_id  VARCHAR(100)           COMMENT '관련 트랜잭션 ID',
@@ -45,6 +48,14 @@ CREATE TABLE IF NOT EXISTS fault_detection (
     detail          TEXT                   COMMENT '탐지 상세 내용',
     CONSTRAINT fk_detection_pattern FOREIGN KEY (pattern_id) REFERENCES fault_pattern(id)
 ) ENGINE=InnoDB COMMENT='장애 탐지 결과 테이블';
+
+-- ============================================================
+--  기존 테이블 컬럼 변경 (이미 테이블이 있는 경우 실행)
+-- ============================================================
+-- ALTER TABLE analysis_result CHANGE id session_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '분석 세션 ID';
+-- ALTER TABLE analysis_result ADD COLUMN log_key VARCHAR(100) COMMENT '로그 파일 키' AFTER session_id;
+-- ALTER TABLE analysis_result CHANGE total_msg_count total_transaction INT NOT NULL DEFAULT 0 COMMENT '전체 트랜잭션 수';
+-- ALTER TABLE analysis_result CHANGE fault_count fault_transaction_count INT NOT NULL DEFAULT 0 COMMENT '장애 트랜잭션 수';
 
 -- ============================================================
 --  샘플 패턴 데이터

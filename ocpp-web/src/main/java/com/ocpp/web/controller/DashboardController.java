@@ -29,12 +29,17 @@ public class DashboardController {
         model.addAttribute("currentMenu", "dashboard");
         try {
             List<AnalysisResultDto> history = engineClient.getHistory(30);
-            long totalFaults = history.stream().mapToLong(AnalysisResultDto::getFaultCount).sum();
-            long totalMsgs   = history.stream().mapToLong(AnalysisResultDto::getTotalMsgCount).sum();
-            model.addAttribute("history",      history);
-            model.addAttribute("totalFaults",  totalFaults);
-            model.addAttribute("totalMsgs",    totalMsgs);
-            model.addAttribute("historyCount", history.size());
+
+            long totalTransaction     = history.stream()
+                    .mapToLong(AnalysisResultDto::getTotalTransaction).sum();
+            long totalFaultTransaction = history.stream()
+                    .mapToLong(AnalysisResultDto::getFaultTransactionCount).sum();
+
+            model.addAttribute("history",              history);
+            model.addAttribute("totalTransaction",     totalTransaction);
+            model.addAttribute("totalFaultTransaction", totalFaultTransaction);
+            model.addAttribute("historyCount",         history.size());
+
         } catch (Exception e) {
             log.warn("엔진 연결 실패 - 빈 대시보드 표시: {}", e.getMessage());
             model.addAttribute("engineError", true);

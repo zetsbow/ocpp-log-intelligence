@@ -9,15 +9,18 @@ import java.time.LocalDateTime;
  */
 @Data
 public class FaultDetection {
-    private Long id;
-    private Long analysisId;
-    private String chargerId;
-    private Long patternId;
-    private String patternName;    // JOIN용
-    private String transactionId;
+    private Long          id;
+
+    /** 분석 세션 ID FK (analysis_result.session_id 참조, CHAR(13)) */
+    private String        analysisId;
+
+    private String        chargerId;
+    private Long          patternId;
+    private String        patternName;
+    private String        transactionId;
     private LocalDateTime detectedAt;
-    private String triggerMsg;
-    private String followMsg;
-    private String severity;
-    private String detail;
+    private String        triggerMsg;
+    private String        followMsg;
+    private String        severity;
+    private String        detail;
 }
