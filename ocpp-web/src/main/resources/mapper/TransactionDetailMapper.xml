@@ -15,11 +15,15 @@
         <result property="direction"     column="direction"/>
         <result property="status"        column="status"/>
         <result property="detailText"    column="detail_text"/>
+        <result property="isFault"       column="is_fault"/>
     </resultMap>
 
     <!-- 공통 WHERE 절 -->
     <sql id="searchWhere">
         WHERE session_id = #{sessionId}
+        <if test="transactionId != null and transactionId != ''">
+            AND transaction_id = #{transactionId}
+        </if>
         <if test="chargerId != null and chargerId != ''">
             AND charger_id = #{chargerId}
         </if>
@@ -28,6 +32,16 @@
         </if>
         <if test="direction != null and direction != ''">
             AND direction = #{direction}
+        </if>
+        <!--
+            isFault: 1 → 장애(Y), 0 → 정상(N)
+            DB는 VARCHAR 'Y'/'N' 저장
+        -->
+        <if test="isFault != null and isFault == 1">
+            AND is_fault = 'Y'
+        </if>
+        <if test="isFault != null and isFault == 0">
+            AND is_fault = 'N'
         </if>
     </sql>
 
@@ -44,7 +58,8 @@
             message_type,
             direction,
             status,
-            detail_text
+            detail_text,
+            is_fault
         FROM transaction_detail
         <include refid="searchWhere"/>
         ORDER BY id ASC

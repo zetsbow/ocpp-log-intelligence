@@ -15,4 +15,5 @@ public class OcppFlowEntryDto {
     private String direction;
     private String status;
     private String detailText;
+    private String isFault;   // Y:장애, N:정상
 }

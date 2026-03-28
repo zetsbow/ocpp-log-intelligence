@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ocpp.web.mapper.FlowViolationMapper">
+
+    <resultMap id="rm" type="FlowViolationDto">
+        <id     property="id"            column="id"/>
+        <result property="sessionId"     column="session_id"/>
+        <result property="transactionId" column="transaction_id"/>
+        <result property="chargerId"     column="charger_id"/>
+        <result property="severity"      column="severity"/>
+        <result property="timestamp"     column="log_timestamp"/>
+        <result property="message"       column="message"/>
+    </resultMap>
+
+    <!-- 공통 WHERE 절 -->
+    <sql id="searchWhere">
+        WHERE session_id = #{sessionId}
+        <if test="transactionId != null and transactionId != ''">
+            AND transaction_id = #{transactionId}
+        </if>
+        <if test="chargerId != null and chargerId != ''">
+            AND charger_id = #{chargerId}
+        </if>
+        <if test="severity != null and severity != ''">
+            AND severity = #{severity}
+        </if>
+    </sql>
+
+    <!-- sessionId 전체 조회 -->
+    <select id="findBySessionId" resultMap="rm">
+        SELECT id, session_id, transaction_id, charger_id, severity, log_timestamp, message
+        FROM flow_violation
+        WHERE session_id = #{sessionId}
+        ORDER BY id ASC
+    </select>
+
+    <!-- 검색조건 조회 -->
+    <select id="findByCondition" resultMap="rm">
+        SELECT id, session_id, transaction_id, charger_id, severity, log_timestamp, message
+        FROM flow_violation
+        <include refid="searchWhere"/>
+        ORDER BY id ASC
+    </select>
+
+    <!-- 총 건수 -->
+    <select id="countBySessionId" resultType="int">
+        SELECT COUNT(*) FROM flow_violation WHERE session_id = #{sessionId}
+    </select>
+
+</mapper>

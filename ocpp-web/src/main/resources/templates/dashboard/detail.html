@@ -5,116 +5,93 @@
 <head>
   <title>트랜잭션 상세 - OCPP Analyzer</title>
   <style>
-    /* ── 페이지 헤더 ─────────────────────────────────── */
-    .page-header h4 { font-size: 1.3rem; font-weight: 800; color: #1a237e; margin: 0; }
-    .page-header .sub { font-size: .83rem; color: #90a4ae; margin-top: .2rem; }
+    .page-header h4 { font-size:1.3rem; font-weight:800; color:#1a237e; margin:0; }
+    .page-header .sub { font-size:.83rem; color:#90a4ae; margin-top:.2rem; }
 
-    /* ── 카드 공통 ───────────────────────────────────── */
     .detail-card {
-      border: none;
-      border-radius: 16px;
-      box-shadow: 0 2px 12px rgba(0,0,0,.07);
-      margin-bottom: 1.5rem;
-      overflow: hidden;
+      border:none; border-radius:16px;
+      box-shadow:0 2px 12px rgba(0,0,0,.07);
+      margin-bottom:1.5rem; overflow:hidden;
     }
     .detail-card .card-header {
-      background: #f8fafc;
-      border-bottom: 1px solid rgba(0,0,0,.07);
-      padding: .85rem 1.3rem;
-      font-size: .92rem;
-      font-weight: 700;
-      color: #1a237e;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      background:#f8fafc; border-bottom:1px solid rgba(0,0,0,.07);
+      padding:.85rem 1.3rem; font-size:.92rem; font-weight:700; color:#1a237e;
+      display:flex; align-items:center; justify-content:space-between;
     }
 
-    /* ── 요약 카드 ───────────────────────────────────── */
-    .summary-label { font-size: .75rem; color: #90a4ae; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
-    .summary-value { font-size: .95rem; font-weight: 600; color: #37474f; margin-top: .15rem; }
-    .summary-value code { font-size: .88rem; color: #5c6bc0; }
+    .summary-label { font-size:.75rem; color:#90a4ae; font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+    .summary-value { font-size:.95rem; font-weight:600; color:#37474f; margin-top:.15rem; }
+    .summary-value code { font-size:.88rem; color:#5c6bc0; }
 
-    /* ── KPI 미니 배지 ───────────────────────────────── */
-    .kpi-mini {
-      background: #e8eaf6;
-      color: #3949ab;
-      border-radius: 10px;
-      padding: .35rem .8rem;
-      font-size: .82rem;
-      font-weight: 700;
-      display: inline-block;
+    .kpi-mini { background:#e8eaf6; color:#3949ab; border-radius:10px; padding:.35rem .8rem; font-size:.82rem; font-weight:700; display:inline-block; }
+    .kpi-mini.red   { background:#ffebee; color:#c62828; }
+    .kpi-mini.green { background:#e8f5e9; color:#2e7d32; }
+    .kpi-mini.orange { background:#fff3e0; color:#e65100; }
+
+    /* ── 탭 ─────────────────────────────────────────── */
+    .detail-tabs { border-bottom:2px solid #e8eaf6; margin-bottom:0; padding:0 1.3rem; background:#fff; display:flex; gap:0; }
+    .detail-tab-btn {
+      background:none; border:none; border-bottom:3px solid transparent;
+      padding:.75rem 1.2rem; font-size:.88rem; font-weight:600; color:#90a4ae;
+      cursor:pointer; margin-bottom:-2px; transition:color .15s, border-color .15s;
+      display:flex; align-items:center; gap:6px;
     }
-    .kpi-mini.red { background: #ffebee; color: #c62828; }
-    .kpi-mini.green { background: #e8f5e9; color: #2e7d32; }
+    .detail-tab-btn:hover { color:#3949ab; }
+    .detail-tab-btn.active { color:#1a237e; border-bottom-color:#3949ab; }
+    .detail-tab-btn .tab-badge {
+      background:#e8eaf6; color:#3949ab; border-radius:10px;
+      padding:1px 7px; font-size:.72rem; font-weight:700;
+    }
+    .detail-tab-btn.active .tab-badge { background:#3949ab; color:#fff; }
+    .detail-tab-btn .tab-badge.err { background:#ffebee; color:#c62828; }
+    .detail-tab-btn.active .tab-badge.err { background:#c62828; color:#fff; }
 
-    /* ── 테이블 ─────────────────────────────────────── */
+    .tab-pane { display:none; }
+    .tab-pane.active { display:block; }
+
+    /* ── 테이블 공통 ─────────────────────────────────── */
     .detail-table th {
-      font-size: .7rem;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: #78909c;
-      font-weight: 600;
-      background: #f8fafc;
-      border-bottom: 2px solid #e8eaf6;
-      padding: .65rem .9rem;
-      white-space: nowrap;
+      font-size:.7rem; text-transform:uppercase; letter-spacing:.06em;
+      color:#78909c; font-weight:600; background:#f8fafc;
+      border-bottom:2px solid #e8eaf6; padding:.65rem .9rem; white-space:nowrap;
     }
     .detail-table td {
-      font-size: .82rem;
-      padding: .65rem .9rem;
-      vertical-align: middle;
-      border-bottom: 1px solid #f0f4f8;
-      color: #37474f;
+      font-size:.82rem; padding:.65rem .9rem; vertical-align:middle;
+      border-bottom:1px solid #f0f4f8; color:#37474f;
     }
-    .detail-table tr:last-child td { border-bottom: none; }
-    .detail-table tr:hover td { background: #f5f7ff; }
+    .detail-table tr:last-child td { border-bottom:none; }
+    .detail-table tr:hover td { background:#f5f7ff; }
 
-    /* ── 메시지 유형 뱃지 ────────────────────────────── */
-    .badge-call       { background: #e3f2fd; color: #1565c0; font-weight: 700; }
-    .badge-callresult { background: #e8f5e9; color: #2e7d32; font-weight: 700; }
-    .badge-callerror  { background: #ffebee; color: #c62828; font-weight: 700; }
-    .badge-msg { border-radius: 20px; padding: 2px 9px; font-size: .72rem; }
+    .badge-call       { background:#e3f2fd; color:#1565c0; font-weight:700; }
+    .badge-callresult { background:#e8f5e9; color:#2e7d32; font-weight:700; }
+    .badge-callerror  { background:#ffebee; color:#c62828; font-weight:700; }
+    .badge-msg { border-radius:20px; padding:2px 9px; font-size:.72rem; }
 
-    /* ── 방향 ───────────────────────────────────────── */
-    .dir-cp { color: #e65100; font-weight: 700; font-size: .8rem; }
-    .dir-cs { color: #1565c0; font-weight: 700; font-size: .8rem; }
+    .badge-error { background:#ffebee; color:#c62828; font-weight:700; border-radius:20px; padding:2px 9px; font-size:.72rem; }
+    .badge-warn  { background:#fff3e0; color:#e65100; font-weight:700; border-radius:20px; padding:2px 9px; font-size:.72rem; }
 
-    /* ── 세션 뱃지 ──────────────────────────────────── */
+    .dir-cp { color:#e65100; font-weight:700; font-size:.8rem; }
+    .dir-cs { color:#1565c0; font-weight:700; font-size:.8rem; }
+
     .session-badge {
-      display: inline-block;
-      background: #e8eaf6;
-      color: #3949ab;
-      font-family: 'Courier New', monospace;
-      font-size: .78rem;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 6px;
+      display:inline-block; background:#e8eaf6; color:#3949ab;
+      font-family:'Courier New',monospace; font-size:.78rem; font-weight:700;
+      padding:3px 8px; border-radius:6px;
     }
+    .empty-state { padding:3rem 0; text-align:center; color:#b0bec5; }
+    .empty-state i { font-size:2.2rem; margin-bottom:.6rem; display:block; }
+    .text-ellipsis { max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .detail-text { font-size:.75rem; color:#78909c; }
 
-    /* ── 빈 상태 ─────────────────────────────────────── */
-    .empty-state { padding: 3rem 0; text-align: center; color: #b0bec5; }
-    .empty-state i { font-size: 2.2rem; margin-bottom: .6rem; display: block; }
-
-    /* ── 상세 팝오버 텍스트 ──────────────────────────── */
-    .text-ellipsis { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .detail-text { font-size: .75rem; color: #78909c; }
-
-    /* ── 뒤로가기 버튼 ───────────────────────────────── */
     .btn-back {
-      background: #f1f3f4;
-      border: none;
-      border-radius: 8px;
-      padding: .42rem 1rem;
-      font-size: .82rem;
-      font-weight: 600;
-      color: #37474f;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      text-decoration: none;
-      transition: background .2s;
+      background:#f1f3f4; border:none; border-radius:8px; padding:.42rem 1rem;
+      font-size:.82rem; font-weight:600; color:#37474f;
+      display:flex; align-items:center; gap:5px; text-decoration:none; transition:background .2s;
     }
-    .btn-back:hover { background: #e8eaf6; color: #1a237e; }
+    .btn-back:hover { background:#e8eaf6; color:#1a237e; }
+
+    /* 위반 메시지 말줄임 */
+    .violation-msg { max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.82rem; }
   </style>
 </head>
 
@@ -124,20 +101,15 @@
   <div class="page-header d-flex align-items-center justify-content-between mb-4">
     <div>
       <h4><i class="bi bi-list-columns-reverse me-2"></i>트랜잭션 상세</h4>
-      <div class="sub">
-        세션 <span class="session-badge" th:text="${sessionId}">-</span> 의 OCPP 전문 흐름
-      </div>
+      <div class="sub">세션 <span class="session-badge" th:text="${sessionId}">-</span> 의 OCPP 전문 흐름</div>
     </div>
-    <a th:href="@{/dashboard}" class="btn-back">
-      <i class="bi bi-arrow-left"></i> 대시보드로
-    </a>
+    <a th:href="@{/dashboard}" class="btn-back"><i class="bi bi-arrow-left"></i> 대시보드로</a>
   </div>
 
   <!-- 엔진 오류 -->
   <div th:if="${engineError}"
        style="border:none;border-radius:12px;background:#fff3e0;color:#e65100;padding:.9rem 1.2rem;font-size:.88rem;display:flex;align-items:center;gap:.6rem;margin-bottom:1.5rem;">
-    <i class="bi bi-exclamation-triangle-fill"></i>
-    ocpp-engine(7778) 에 연결할 수 없습니다. 엔진 서버를 먼저 기동해주세요.
+    <i class="bi bi-exclamation-triangle-fill"></i> ocpp-engine(7778) 에 연결할 수 없습니다.
   </div>
 
   <!-- ── 분석 결과 요약 카드 ─────────────────────────────── -->
@@ -159,231 +131,294 @@
         </div>
         <div class="col-6 col-md-2">
           <div class="summary-label">전체 트랜잭션</div>
-          <div class="summary-value">
-            <span class="kpi-mini" th:text="${result.totalTransaction}">0</span>
-          </div>
+          <div class="summary-value"><span class="kpi-mini" th:text="${result.totalTransaction}">0</span></div>
         </div>
         <div class="col-6 col-md-2">
           <div class="summary-label">장애 트랜잭션</div>
           <div class="summary-value">
-            <span th:classappend="${result.faultTransactionCount > 0} ? 'red' : 'green'"
-                  class="kpi-mini"
+            <span class="kpi-mini" th:classappend="${result.faultTransactionCount > 0} ? 'red' : 'green'"
                   th:text="${result.faultTransactionCount}">0</span>
           </div>
         </div>
         <div class="col-12 col-md-2">
           <div class="summary-label">파일명</div>
-          <div class="summary-value" style="font-size:.82rem;word-break:break-all"
-               th:text="${result.fileName} ?: '-'">-</div>
+          <div class="summary-value" style="font-size:.82rem;word-break:break-all" th:text="${result.fileName} ?: '-'">-</div>
         </div>
         <div class="col-12" th:if="${result.summary != null and !result.summary.isEmpty()}">
           <div class="summary-label">요약</div>
-          <div style="font-size:.83rem;color:#546e7a;margin-top:.2rem;line-height:1.5"
-               th:text="${result.summary}">-</div>
+          <div style="font-size:.83rem;color:#546e7a;margin-top:.2rem;line-height:1.5" th:text="${result.summary}">-</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ── 트랜잭션 상세 테이블 ─────────────────────────────── -->
+  <!-- ── 탭 카드 ───────────────────────────────────────── -->
   <div class="detail-card card">
-    <div class="card-header">
-      <span><i class="bi bi-table me-2"></i>트랜잭션 상세 <small style="font-size:.72rem;color:#90a4ae;font-weight:400">(transaction_detail)</small></span>
-      <span class="kpi-mini"
-            th:text="${totalCount != null} ? ${totalCount} + '건' : '0건'">0건</span>
+
+    <!-- 탭 헤더 -->
+    <div class="detail-tabs">
+      <button class="detail-tab-btn" th:classappend="${activeTab == 'detail'} ? 'active'"
+              onclick="switchTab('detail', this)">
+        <i class="bi bi-table"></i> 트랜잭션 상세
+        <span class="tab-badge" th:text="${totalCount != null} ? ${totalCount} : 0">0</span>
+      </button>
+      <button class="detail-tab-btn" th:classappend="${activeTab == 'violation'} ? 'active'"
+              onclick="switchTab('violation', this)">
+        <i class="bi bi-exclamation-triangle"></i> 흐름 위반
+        <span class="tab-badge err" th:text="${violationCount != null} ? ${violationCount} : 0">0</span>
+      </button>
     </div>
 
-    <!-- ── 검색 폼 ───────────────────────────────────────── -->
-    <div style="padding:.85rem 1.3rem;border-bottom:1px solid #f0f4f8;background:#fafbfc">
-      <form method="get" th:action="@{/dashboard/detail/{sid}(sid=${sessionId})}"
-            class="row g-2 align-items-end">
-        <input type="hidden" name="page" value="1"/>
-        <input type="hidden" name="size" th:value="${pageSize}"/>
+    <!-- ══════════════════════════════════════════════════ -->
+    <!-- 탭1: 트랜잭션 상세                                  -->
+    <!-- ══════════════════════════════════════════════════ -->
+    <div id="tab-detail" class="tab-pane" th:classappend="${activeTab == 'detail'} ? 'active'">
 
-        <!-- 충전기 ID -->
-        <div class="col-sm-6 col-md-3">
-          <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase;letter-spacing:.05em">
-            충전기 ID
-          </label>
-          <input type="text" name="chargerId" class="form-control form-control-sm"
-                 placeholder="충전기 ID 입력"
-                 th:value="${srchChargerId}"/>
-        </div>
+      <!-- 검색 폼 -->
+      <div style="padding:.85rem 1.3rem;border-bottom:1px solid #f0f4f8;background:#fafbfc">
+        <form method="get" th:action="@{/dashboard/detail/{sid}(sid=${sessionId})}"
+              class="row g-2 align-items-end">
+          <input type="hidden" name="activeTab" value="detail"/>
+          <input type="hidden" name="page" value="1"/>
+          <input type="hidden" name="size" th:value="${pageSize}"/>
 
-        <!-- 액션 -->
-        <div class="col-sm-6 col-md-3">
-          <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase;letter-spacing:.05em">
-            액션 (Action)
-          </label>
-          <input type="text" name="action" class="form-control form-control-sm"
-                 placeholder="예) Heartbeat, StartTransaction"
-                 th:value="${srchAction}"/>
-        </div>
-
-        <!-- 방향 -->
-        <div class="col-sm-6 col-md-3">
-          <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase;letter-spacing:.05em">
-            방향 (Direction)
-          </label>
-          <select name="direction" class="form-select form-select-sm">
-            <option value="" th:selected="${srchDirection == ''}">전체</option>
-            <option value="CP→CS" th:selected="${srchDirection == 'CP→CS'}">CP→CS</option>
-            <option value="CS→CP" th:selected="${srchDirection == 'CS→CP'}">CS→CP</option>
-          </select>
-        </div>
-
-        <!-- 버튼 -->
-        <div class="col-sm-6 col-md-3 d-flex gap-2">
-          <button type="submit" class="btn btn-sm btn-primary flex-fill">
-            <i class="bi bi-search me-1"></i>검색
-          </button>
-          <a th:href="@{/dashboard/detail/{sid}(sid=${sessionId})}"
-             class="btn btn-sm btn-outline-secondary flex-fill">
-            <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
-          </a>
-        </div>
-      </form>
-    </div>
-
-    <!-- 빈 상태 -->
-    <div th:if="${details == null or details.isEmpty()}" class="empty-state">
-      <i class="bi bi-inbox"></i>
-      <p style="font-size:.88rem">이 세션에 해당하는 트랜잭션 상세 데이터가 없습니다.</p>
-    </div>
-
-    <!-- 테이블 -->
-    <div class="table-responsive" th:if="${details != null and !details.isEmpty()}">
-      <table class="table mb-0 detail-table">
-        <thead>
-          <tr>
-            <th style="width:50px">#</th>
-            <th>트랜잭션 ID</th>
-            <th>충전기</th>
-            <th>서버시간</th>
-            <th>액션(Action)</th>
-            <th>메시지 유형</th>
-            <th>방향</th>
-            <th>타임스탬프</th>
-            <th>상세 정보</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr th:each="d,i : ${details}">
-            <!-- No (전체 기준 행번호) -->
-            <td style="color:#b0bec5;font-size:.75rem"
-                th:text="${startRow + i.index}">1</td>
-
-            <!-- 트랜잭션 ID -->
-            <td>
-              <code style="font-size:.78rem;color:#5c6bc0" th:text="${d.transactionId} ?: '-'">-</code>
-            </td>
-
-            <!-- 충전기 ID -->
-            <td style="font-size:.8rem" th:text="${d.chargerId} ?: '-'">-</td>
-
-            <!-- 타임스탬프 -->
-            <td style="white-space:nowrap;font-size:.78rem;color:#78909c"
-                th:text="${d.timestamp} ?: '-'">-</td>
-
-            <!-- 액션 -->
-            <td><strong style="font-size:.83rem" th:text="${d.action} ?: '-'">-</strong></td>
-
-            <!-- 메시지 유형 -->
-            <td>
-              <span class="badge-msg"
-                    th:classappend="${d.messageType == 'Call'} ? 'badge-call'
-                                  : (${d.messageType == 'CallResult'} ? 'badge-callresult'
-                                  : 'badge-callerror')"
-                    th:text="${d.messageType} ?: '-'">-</span>
-            </td>
-
-            <!-- 방향 -->
-            <td>
-              <span th:if="${d.direction != null and d.direction.contains('CP')}" class="dir-cp"
-                    th:text="${d.direction}">CP→CS</span>
-              <span th:if="${d.direction == null or !d.direction.contains('CP')}" class="dir-cs"
-                    th:text="${d.direction} ?: '-'">CS→CP</span>
-            </td>
-
-            <!-- 상태 -->
-            <td class="text-ellipsis" style="max-width:130px"
-                th:text="${d.status} ?: '-'">-</td>
-
-            <!-- 상세 텍스트 -->
-            <td class="detail-text text-ellipsis"
-                th:title="${d.detailText}"
-                th:text="${d.detailText} ?: '-'">-</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- ── 페이지네이션 ───────────────────────────────── -->
-    <div th:if="${totalPages != null and totalPages > 1}"
-         class="d-flex align-items-center justify-content-between px-3 py-2"
-         style="border-top:1px solid #f0f4f8;background:#fafbfc">
-
-      <!-- 총 건수 표시 -->
-      <div style="font-size:.8rem;color:#90a4ae">
-        총 <strong th:text="${totalCount}">0</strong>건
-        (<span th:text="${currentPage}">1</span> / <span th:text="${totalPages}">1</span> 페이지)
+          <div class="col-sm-6 col-md-2">
+            <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase">트랜잭션 ID</label>
+            <input type="text" name="transactionId" class="form-control form-control-sm"
+                   placeholder="트랜잭션 ID" th:value="${srchTransactionId}"/>
+          </div>
+          <div class="col-sm-6 col-md-2">
+            <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase">충전기 ID</label>
+            <input type="text" name="chargerId" class="form-control form-control-sm"
+                   placeholder="충전기 ID" th:value="${srchChargerId}"/>
+          </div>
+          <div class="col-sm-6 col-md-2">
+            <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase">액션</label>
+            <input type="text" name="action" class="form-control form-control-sm"
+                   placeholder="예) Heartbeat" th:value="${srchAction}"/>
+          </div>
+          <div class="col-sm-6 col-md-2">
+            <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase">방향</label>
+            <select name="direction" class="form-select form-select-sm">
+              <option value=""      th:selected="${srchDirection == '' or srchDirection == null}">전체</option>
+              <option value="CP→CS" th:selected="${srchDirection == 'CP→CS'}">CP→CS</option>
+              <option value="CS→CP" th:selected="${srchDirection == 'CS→CP'}">CS→CP</option>
+            </select>
+          </div>
+          <div class="col-sm-6 col-md-2">
+            <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase">장애 여부</label>
+            <select name="isFault" class="form-select form-select-sm">
+              <option value=""  th:selected="${srchIsFault == null}">전체</option>
+              <option value="1" th:selected="${srchIsFault == 1}">장애</option>
+              <option value="0" th:selected="${srchIsFault == 0}">정상</option>
+            </select>
+          </div>
+          <div class="col-sm-6 col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary flex-fill"><i class="bi bi-search me-1"></i>검색</button>
+            <a th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, activeTab='detail')}"
+               class="btn btn-sm btn-outline-secondary flex-fill"><i class="bi bi-arrow-counterclockwise me-1"></i>초기화</a>
+          </div>
+        </form>
       </div>
 
-      <!-- 페이지 버튼 -->
-      <nav>
-        <ul class="pagination pagination-sm mb-0">
-
-          <!-- 이전 그룹 -->
-          <li class="page-item" th:if="${pageStart > 1}">
-            <a class="page-link"
-               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${pageStart - 1}, size=${pageSize}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection})}">«</a>
-          </li>
-
-          <!-- 이전 페이지 -->
-          <li class="page-item" th:classappend="${!hasPrev} ? 'disabled'">
-            <a class="page-link"
-               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${prevPage}, size=${pageSize}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection})}">‹</a>
-          </li>
-
-          <!-- 페이지 번호 -->
-          <li class="page-item"
-              th:each="p : ${#numbers.sequence(pageStart, pageEnd)}"
-              th:classappend="${p == currentPage} ? 'active'">
-            <a class="page-link"
-               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${p}, size=${pageSize}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection})}"
-               th:text="${p}">1</a>
-          </li>
-
-          <!-- 다음 페이지 -->
-          <li class="page-item" th:classappend="${!hasNext} ? 'disabled'">
-            <a class="page-link"
-               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${nextPage}, size=${pageSize}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection})}">›</a>
-          </li>
-
-          <!-- 다음 그룹 -->
-          <li class="page-item" th:if="${pageEnd < totalPages}">
-            <a class="page-link"
-               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${pageEnd + 1}, size=${pageSize}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection})}">»</a>
-          </li>
-
-        </ul>
-      </nav>
-
-      <!-- 페이지 크기 선택 -->
-      <div style="font-size:.8rem;color:#90a4ae;display:flex;align-items:center;gap:6px">
-        페이지당
-        <select class="form-select form-select-sm" style="width:70px"
-                onchange="location.href='/dashboard/detail/[[${sessionId}]]?page=1&size=' + this.value
-                    + '&chargerId=[[${srchChargerId}]]&action=[[${srchAction}]]&direction=' + encodeURIComponent('[[${srchDirection}]]')">
-          <option th:value="10"  th:selected="${pageSize == 10}">10</option>
-          <option th:value="20"  th:selected="${pageSize == 20}">20</option>
-          <option th:value="50"  th:selected="${pageSize == 50}">50</option>
-          <option th:value="100" th:selected="${pageSize == 100}">100</option>
-        </select>
-        건
+      <!-- 빈 상태 -->
+      <div th:if="${details == null or details.isEmpty()}" class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <p style="font-size:.88rem">트랜잭션 상세 데이터가 없습니다.</p>
       </div>
-    </div>
-  </div>
 
+      <!-- 테이블 -->
+      <div class="table-responsive" th:if="${details != null and !details.isEmpty()}">
+        <table class="table mb-0 detail-table">
+          <thead>
+            <tr>
+              <th style="width:45px">#</th>
+              <th>트랜잭션 ID</th>
+              <th>충전기</th>
+              <th>서버시간</th>
+              <th>액션(Action)</th>
+              <th>메시지 유형</th>
+              <th>방향</th>
+              <th>타임스탬프</th>
+              <th>장애</th>
+              <th>상세 정보</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="d,i : ${details}" th:classappend="${d.isFault == 'Y'} ? 'table-danger'">
+              <td style="color:#b0bec5;font-size:.75rem" th:text="${startRow + i.index}">1</td>
+              <td><code style="font-size:.78rem;color:#5c6bc0" th:text="${d.transactionId} ?: '-'">-</code></td>
+              <td style="font-size:.8rem" th:text="${d.chargerId} ?: '-'">-</td>
+              <td style="white-space:nowrap;font-size:.78rem;color:#78909c" th:text="${d.timestamp} ?: '-'">-</td>
+              <td><strong style="font-size:.83rem" th:text="${d.action} ?: '-'">-</strong></td>
+              <td>
+                <span class="badge-msg"
+                      th:classappend="${d.messageType == 'Call'} ? 'badge-call'
+                                    : (${d.messageType == 'CallResult'} ? 'badge-callresult' : 'badge-callerror')"
+                      th:text="${d.messageType} ?: '-'">-</span>
+              </td>
+              <td>
+                <span th:if="${d.direction != null and d.direction.contains('CP')}" class="dir-cp" th:text="${d.direction}">CP→CS</span>
+                <span th:if="${d.direction == null or !d.direction.contains('CP')}" class="dir-cs" th:text="${d.direction} ?: '-'">CS→CP</span>
+              </td>
+              <td class="text-ellipsis" style="max-width:130px" th:text="${d.status} ?: '-'">-</td>
+              <td>
+                <span th:if="${d.isFault == 'Y'}" class="badge-msg badge-callerror" style="border-radius:20px;padding:2px 9px;font-size:.72rem">장애</span>
+                <span th:if="${d.isFault != 'Y'}" style="font-size:.72rem;color:#b0bec5">-</span>
+              </td>
+              <td class="detail-text text-ellipsis" th:title="${d.detailText}" th:text="${d.detailText} ?: '-'">-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 페이지네이션 -->
+      <div th:if="${totalPages != null and totalPages > 1}"
+           class="d-flex align-items-center justify-content-between px-3 py-2"
+           style="border-top:1px solid #f0f4f8;background:#fafbfc">
+        <div style="font-size:.8rem;color:#90a4ae">
+          총 <strong th:text="${totalCount}">0</strong>건
+          (<span th:text="${currentPage}">1</span> / <span th:text="${totalPages}">1</span> 페이지)
+        </div>
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item" th:if="${pageStart > 1}">
+              <a class="page-link" th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, activeTab='detail', page=${pageStart-1}, size=${pageSize}, transactionId=${srchTransactionId}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection}, isFault=${srchIsFault})}">«</a>
+            </li>
+            <li class="page-item" th:classappend="${!hasPrev} ? 'disabled'">
+              <a class="page-link" th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, activeTab='detail', page=${prevPage}, size=${pageSize}, transactionId=${srchTransactionId}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection}, isFault=${srchIsFault})}">‹</a>
+            </li>
+            <li class="page-item" th:each="p : ${#numbers.sequence(pageStart, pageEnd)}"
+                th:classappend="${p == currentPage} ? 'active'">
+              <a class="page-link"
+                 th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, activeTab='detail', page=${p}, size=${pageSize}, transactionId=${srchTransactionId}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection}, isFault=${srchIsFault})}"
+                 th:text="${p}">1</a>
+            </li>
+            <li class="page-item" th:classappend="${!hasNext} ? 'disabled'">
+              <a class="page-link" th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, activeTab='detail', page=${nextPage}, size=${pageSize}, transactionId=${srchTransactionId}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection}, isFault=${srchIsFault})}">›</a>
+            </li>
+            <li class="page-item" th:if="${pageEnd < totalPages}">
+              <a class="page-link" th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, activeTab='detail', page=${pageEnd+1}, size=${pageSize}, transactionId=${srchTransactionId}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection}, isFault=${srchIsFault})}">»</a>
+            </li>
+          </ul>
+        </nav>
+        <div style="font-size:.8rem;color:#90a4ae;display:flex;align-items:center;gap:6px">
+          페이지당
+          <select class="form-select form-select-sm" style="width:70px"
+                  onchange="location.href='/dashboard/detail/[[${sessionId}]]?activeTab=detail&page=1&size='+this.value+'&transactionId=[[${srchTransactionId}]]&chargerId=[[${srchChargerId}]]&action=[[${srchAction}]]&direction='+encodeURIComponent('[[${srchDirection}]]')+'&isFault=[[${srchIsFault}]]'">
+            <option th:value="10"  th:selected="${pageSize==10}">10</option>
+            <option th:value="20"  th:selected="${pageSize==20}">20</option>
+            <option th:value="50"  th:selected="${pageSize==50}">50</option>
+            <option th:value="100" th:selected="${pageSize==100}">100</option>
+          </select>건
+        </div>
+      </div>
+    </div><!-- /tab-detail -->
+
+    <!-- ══════════════════════════════════════════════════ -->
+    <!-- 탭2: 흐름 위반                                      -->
+    <!-- ══════════════════════════════════════════════════ -->
+    <div id="tab-violation" class="tab-pane" th:classappend="${activeTab == 'violation'} ? 'active'">
+
+      <!-- 검색 폼 -->
+      <div style="padding:.85rem 1.3rem;border-bottom:1px solid #f0f4f8;background:#fafbfc">
+        <form method="get" th:action="@{/dashboard/detail/{sid}(sid=${sessionId})}"
+              class="row g-2 align-items-end">
+          <input type="hidden" name="activeTab" value="violation"/>
+
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase">트랜잭션 ID</label>
+            <input type="text" name="vTransactionId" class="form-control form-control-sm"
+                   placeholder="트랜잭션 ID" th:value="${vTransactionId}"/>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase">충전기 ID</label>
+            <input type="text" name="vChargerId" class="form-control form-control-sm"
+                   placeholder="충전기 ID" th:value="${vChargerId}"/>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase">심각도</label>
+            <select name="vSeverity" class="form-select form-select-sm">
+              <option value=""      th:selected="${vSeverity == '' or vSeverity == null}">전체</option>
+              <option value="ERROR" th:selected="${vSeverity == 'ERROR'}">ERROR</option>
+              <option value="WARN"  th:selected="${vSeverity == 'WARN'}">WARN</option>
+            </select>
+          </div>
+          <div class="col-sm-6 col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary flex-fill"><i class="bi bi-search me-1"></i>검색</button>
+            <a th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, activeTab='violation')}"
+               class="btn btn-sm btn-outline-secondary flex-fill"><i class="bi bi-arrow-counterclockwise me-1"></i>초기화</a>
+          </div>
+        </form>
+      </div>
+
+      <!-- 빈 상태 -->
+      <div th:if="${violations == null or violations.isEmpty()}" class="empty-state">
+        <i class="bi bi-check-circle" style="color:#a5d6a7"></i>
+        <p style="font-size:.88rem">이 세션에 탐지된 흐름 위반이 없습니다.</p>
+      </div>
+
+      <!-- 테이블 -->
+      <div class="table-responsive" th:if="${violations != null and !violations.isEmpty()}">
+        <table class="table mb-0 detail-table">
+          <thead>
+            <tr>
+              <th style="width:45px">#</th>
+              <th>심각도</th>
+              <th>트랜잭션 ID</th>
+              <th>충전기</th>
+              <th>발생 시각</th>
+              <th>위반 내용</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="v,i : ${violations}"
+                th:classappend="${v.severity == 'ERROR'} ? 'table-danger' : 'table-warning'">
+              <td style="color:#b0bec5;font-size:.75rem" th:text="${i.count}">1</td>
+              <td>
+                <span th:if="${v.severity == 'ERROR'}" class="badge-error">ERROR</span>
+                <span th:if="${v.severity == 'WARN'}"  class="badge-warn">WARN</span>
+                <span th:if="${v.severity != 'ERROR' and v.severity != 'WARN'}"
+                      class="badge-msg" style="background:#e8eaf6;color:#3949ab;border-radius:20px;padding:2px 9px"
+                      th:text="${v.severity}">-</span>
+              </td>
+              <td><code style="font-size:.78rem;color:#5c6bc0" th:text="${v.transactionId} ?: '-'">-</code></td>
+              <td style="font-size:.8rem" th:text="${v.chargerId} ?: '-'">-</td>
+              <td style="white-space:nowrap;font-size:.78rem;color:#78909c" th:text="${v.timestamp} ?: '-'">-</td>
+              <td class="violation-msg" th:title="${v.message}" th:text="${v.message} ?: '-'">-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 위반 통계 푸터 -->
+      <div th:if="${violations != null and !violations.isEmpty()}"
+           class="d-flex align-items-center gap-3 px-3 py-2"
+           style="border-top:1px solid #f0f4f8;background:#fafbfc;font-size:.8rem;color:#90a4ae">
+        <span>총 <strong th:text="${violations.size()}">0</strong>건</span>
+        <span style="color:#c62828">
+          ERROR <strong th:text="${#lists.size(violations.?[severity == 'ERROR'])}">0</strong>건
+        </span>
+        <span style="color:#e65100">
+          WARN <strong th:text="${#lists.size(violations.?[severity == 'WARN'])}">0</strong>건
+        </span>
+      </div>
+    </div><!-- /tab-violation -->
+
+  </div><!-- /detail-card -->
+
+</th:block>
+
+<th:block layout:fragment="script">
+<script th:inline="javascript">
+  function switchTab(tabName, btn) {
+    // 탭 버튼 active 전환
+    document.querySelectorAll('.detail-tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    // 탭 콘텐츠 전환
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + tabName).classList.add('active');
+  }
+</script>
 </th:block>
 </html>
