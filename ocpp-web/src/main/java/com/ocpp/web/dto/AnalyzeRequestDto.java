@@ -6,6 +6,15 @@ import java.time.LocalDateTime;
 
 @Data
 public class AnalyzeRequestDto {
+
+    /**
+     * 분석 세션 ID — 파일명의 뒷부분에서 추출
+     * 파일명: OCPP-LOG-ANALYSIS-20260328-0001.txt
+     * sessionId: 20260328-0001 (CHAR 13자리)
+     * analysis_result.session_id(PK) 로 직접 사용
+     */
+    private String sessionId;
+
     /** 충전기 ID 필터 (null = 전체) */
     private String chargerId;
 
@@ -15,8 +24,7 @@ public class AnalyzeRequestDto {
 
     /**
      * 파일 URL (URL 인코딩 적용)
-     * 예) http://localhost:7777/log/upload/%EC%A0%95%EC%83%81%EC%B6%A9%EC%A0%84%EB%A1%9C%EA%B7%B8.txt
-     * engine이 이 URL을 HTTP GET으로 호출하여 파일 내용을 읽음
+     * 예) http://127.0.0.1:7777/log/upload/OCPP-LOG-ANALYSIS-20260328-0001.txt
      */
     private String fileUrl;
 

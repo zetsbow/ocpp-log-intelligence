@@ -21,14 +21,10 @@ import java.util.stream.Collectors;
 /**
  * 로그 분석 서비스
  *
- * [session_id 생성 규칙]
- * - CHAR(13) PK, AUTO_INCREMENT 없음 → 서비스에서 직접 생성
- * - log_key와 동일한 값 사용 (파일명에서 추출)
- * - 예) OCPP-LOG-ANALYSIS-20260328-0001.txt → session_id = "20260328-0001" (13자리)
- *
- * [log_key 추출 규칙]
- * - 파일명에서 prefix "OCPP-LOG-ANALYSIS-" 와 확장자 제거
- * - OCPP-LOG-ANALYSIS-20260328-0001.txt → 20260328-0001
+ * [sessionId]
+ * - ocpp-web에서 파일명으로부터 추출하여 AnalyzeRequest에 담아 전달
+ * - 예) OCPP-LOG-ANALYSIS-20260328-0001.txt → sessionId = "20260328-0001"
+ * - analysis_result.session_id(PK) 로 직접 사용
  */
 @Slf4j
 @Service
@@ -41,11 +37,10 @@ public class AnalysisService {
     private final FaultDetectionMapper  faultDetectionMapper;
     private final RestTemplate          restTemplate;
 
-    private static final String FILE_PREFIX = "OCPP-LOG-ANALYSIS-";
-
     @Transactional
     public AnalysisResult analyze(AnalyzeRequest request) {
-        log.info("분석 시작 - chargerId={}, fileUrl={}", request.getChargerId(), request.getFileUrl());
+        log.info("분석 시작 - sessionId={}, chargerId={}, fileUrl={}",
+                request.getSessionId(), request.getChargerId(), request.getFileUrl());
 
         // 1. 파일 내용 읽기
         String logContent = readLogContent(request);
@@ -57,18 +52,13 @@ public class AnalysisService {
 
         List<FaultDetection> detections = patternMatcher.match(filtered);
 
-        // 3. 파일명 → logKey → sessionId 결정
-        //    logKey = sessionId = "20260328-0001" (CHAR 13자리)
+        // 3. sessionId는 request에서 직접 사용 (ocpp-web이 파일명으로부터 추출하여 전달)
+        String sessionId = request.getSessionId();
         String fileName  = resolveFileName(request);
-        String logKey    = extractLogKey(fileName);
-        String sessionId = logKey;   // session_id = log_key (동일값)
 
-        log.info("sessionId={}, logKey={}, fileName={}", sessionId, logKey, fileName);
-
-        // 4. 분석 이력 저장 (session_id 직접 지정)
+        // 4. 분석 이력 저장
         AnalysisResult result = new AnalysisResult();
         result.setSessionId(sessionId);
-        result.setLogKey(logKey);
         result.setChargerId(request.getChargerId());
         result.setAnalyzedAt(LocalDateTime.now());
         result.setTotalTransaction(filtered.size());
@@ -88,29 +78,6 @@ public class AnalysisService {
         log.info("분석 완료 - sessionId={}, 트랜잭션 {}건, 장애 {}건",
                 sessionId, filtered.size(), detections.size());
         return result;
-    }
-
-    /**
-     * 파일명에서 log_key(= session_id) 추출
-     * OCPP-LOG-ANALYSIS-20260328-0001.txt → 20260328-0001 (CHAR 13)
-     */
-    private String extractLogKey(String fileName) {
-        if (fileName == null) return "UNKNOWN";
-
-        // 확장자 제거
-        String nameWithoutExt = fileName.contains(".")
-                ? fileName.substring(0, fileName.lastIndexOf('.'))
-                : fileName;
-
-        // prefix 제거
-        if (nameWithoutExt.startsWith(FILE_PREFIX)) {
-            return nameWithoutExt.substring(FILE_PREFIX.length()); // 20260328-0001
-        }
-
-        // 채번 패턴이 아닌 경우 최대 13자리로 잘라서 반환
-        return nameWithoutExt.length() > 13
-                ? nameWithoutExt.substring(0, 13)
-                : nameWithoutExt;
     }
 
     private String readLogContent(AnalyzeRequest request) {

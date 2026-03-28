@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -29,14 +30,15 @@ import java.util.stream.Stream;
  * 로그 분석 컨트롤러
  *
  * [파일명 채번 규칙]
- * 패턴: OCPP-LOG-ANALYSIS-yyyyMMdd-NNNN
+ * 패턴: OCPP-LOG-ANALYSIS-{yyyyMMdd}-{NNNN}.{ext}
  * 예)   OCPP-LOG-ANALYSIS-20260328-0001.txt
- *       OCPP-LOG-ANALYSIS-20260328-0002.txt
  *
- * - 날짜가 바뀌면 시퀀스 0001부터 재시작
- * - 날짜 내에서 이미 존재하는 최대 시퀀스 + 1로 채번
- * - 원본 파일명은 fileName 필드로 별도 보관 (화면 표시용)
- * - 확장자는 원본 파일 확장자 유지
+ * [sessionId 추출 규칙]
+ * 파일명: OCPP-LOG-ANALYSIS-20260328-0001.txt
+ *   → prefix 'OCPP-LOG-ANALYSIS-' 제거 + 확장자 제거
+ *   → sessionId = "20260328-0001" (CHAR 13자리)
+ *   → engine의 AnalyzeRequest.sessionId 에 담아 전달
+ *   → analysis_result.session_id(PK) 로 직접 사용
  */
 @Slf4j
 @Controller
@@ -54,7 +56,7 @@ public class LogController {
 
     private Path uploadPath;
 
-    private static final String FILE_PREFIX    = "OCPP-LOG-ANALYSIS";
+    private static final String FILE_PREFIX = "OCPP-LOG-ANALYSIS-";
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     @PostConstruct
@@ -76,9 +78,9 @@ public class LogController {
     public String analyze(
             @RequestParam(required = false) String chargerId,
             @RequestParam(required = false)
-            @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") java.time.LocalDateTime fromTime,
+            @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime fromTime,
             @RequestParam(required = false)
-            @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") java.time.LocalDateTime toTime,
+            @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime toTime,
             @RequestParam("logFile") MultipartFile logFile,
             Model model) {
 
@@ -93,25 +95,28 @@ public class LogController {
             // 1. 채번 규칙으로 파일 저장
             Path savedPath = saveWithSequence(logFile);
 
-            // 2. 파일명 URL 인코딩 (영문이므로 인코딩 변화 없음, 안전하게 적용)
-            String encodedFileName = URLEncoder.encode(
-                    savedPath.getFileName().toString(), StandardCharsets.UTF_8);
+            // 2. 저장된 파일명으로부터 sessionId 추출
+            //    OCPP-LOG-ANALYSIS-20260328-0001.txt → 20260328-0001
+            String savedFileName = savedPath.getFileName().toString();
+            String sessionId     = extractSessionId(savedFileName);
 
-            // 3. engine 전달용 fileUrl 생성
-            String fileUrl = webBaseUrl + "/log/upload/" + encodedFileName;
+            // 3. 파일명 URL 인코딩 → fileUrl 생성
+            String encodedFileName = URLEncoder.encode(savedFileName, StandardCharsets.UTF_8);
+            String fileUrl         = webBaseUrl + "/log/upload/" + encodedFileName;
 
             log.info("[LogController] 원본 파일명  : {}", logFile.getOriginalFilename());
-            log.info("[LogController] 저장 파일명  : {}", savedPath.getFileName());
-            log.info("[LogController] 저장 경로    : {}", savedPath);
-            log.info("[LogController] engine URL  : {}", fileUrl);
+            log.info("[LogController] 저장 파일명  : {}", savedFileName);
+            log.info("[LogController] sessionId   : {}", sessionId);
+            log.info("[LogController] fileUrl     : {}", fileUrl);
 
             // 4. engine 요청 DTO 구성
             AnalyzeRequestDto req = new AnalyzeRequestDto();
+            req.setSessionId(sessionId);      // ← 파일명에서 추출한 key
             req.setChargerId(chargerId);
             req.setFromTime(fromTime);
             req.setToTime(toTime);
             req.setFileUrl(fileUrl);
-            req.setFileName(logFile.getOriginalFilename()); // 화면 표시용 원본 파일명
+            req.setFileName(logFile.getOriginalFilename());
 
             // 5. 분석 결과 수신
             AnalysisResultDto result = engineClient.analyzeCharger(req);
@@ -130,55 +135,48 @@ public class LogController {
     }
 
     /**
+     * 파일명에서 sessionId 추출
+     * OCPP-LOG-ANALYSIS-20260328-0001.txt → 20260328-0001
+     */
+    private String extractSessionId(String fileName) {
+        String nameWithoutExt = fileName.contains(".")
+                ? fileName.substring(0, fileName.lastIndexOf('.'))
+                : fileName;
+        if (nameWithoutExt.startsWith(FILE_PREFIX)) {
+            return nameWithoutExt.substring(FILE_PREFIX.length()); // 20260328-0001
+        }
+        return nameWithoutExt;
+    }
+
+    /**
      * 채번 규칙으로 파일 저장
-     *
-     * [패턴] OCPP-LOG-ANALYSIS-{yyyyMMdd}-{NNNN}.{ext}
-     *
-     * 1. 오늘 날짜로 업로드 디렉토리에서 기존 파일 중
-     *    같은 날짜 패턴의 최대 시퀀스 번호를 조회
-     * 2. 최대 시퀀스 + 1 로 파일명 결정
-     * 3. 날짜가 바뀌면 0001부터 재시작
-     *
-     * 예) 오늘 이미 0003까지 있으면 → 0004로 저장
-     *     날짜 변경 시 → 0001부터 재시작
+     * 패턴: OCPP-LOG-ANALYSIS-{yyyyMMdd}-{NNNN}.{ext}
      */
     private Path saveWithSequence(MultipartFile file) throws IOException {
-
-        // 원본 확장자 추출
         String originalName = file.getOriginalFilename();
-        String ext = "";
-        if (originalName != null && originalName.contains(".")) {
-            ext = originalName.substring(originalName.lastIndexOf('.'));  // 예) .txt .log
+        if (originalName == null || originalName.isBlank()) {
+            originalName = "ocpp_log.txt";
         }
 
-        // 오늘 날짜 문자열
-        String today = LocalDate.now().format(DATE_FMT);  // 예) 20260328
+        String ext   = originalName.contains(".")
+                ? originalName.substring(originalName.lastIndexOf('.'))
+                : "";
+        String today = LocalDate.now().format(DATE_FMT);
+        int    nextSeq = findNextSequence(today);
 
-        // 오늘 날짜로 이미 존재하는 최대 시퀀스 조회
-        int nextSeq = findNextSequence(today);
-
-        // 파일명 생성: OCPP-LOG-ANALYSIS-20260328-0001.txt
-        String savedName = String.format("%s-%s-%04d%s", FILE_PREFIX, today, nextSeq, ext);
-        Path savedPath = uploadPath.resolve(savedName);
+        String savedName = String.format("%s%s-%04d%s", FILE_PREFIX, today, nextSeq, ext);
+        Path   savedPath = uploadPath.resolve(savedName);
 
         Files.copy(file.getInputStream(), savedPath, StandardCopyOption.REPLACE_EXISTING);
-        log.info("[채번] 저장 파일명: {} (원본: {})", savedName, originalName);
-
+        log.info("[채번] {} (원본: {})", savedName, originalName);
         return savedPath;
     }
 
     /**
      * 오늘 날짜 기준 다음 시퀀스 번호 계산
-     *
-     * 예) OCPP-LOG-ANALYSIS-20260328-0001.txt 존재 → 2 반환
-     *     OCPP-LOG-ANALYSIS-20260328-0003.txt 가 최대 → 4 반환
-     *     오늘 날짜 파일 없음 → 1 반환
      */
     private int findNextSequence(String today) throws IOException {
-
-        // 오늘 날짜 prefix: OCPP-LOG-ANALYSIS-20260328-
-        String todayPrefix = FILE_PREFIX + "-" + today + "-";
-
+        String todayPrefix = FILE_PREFIX + today + "-";
         AtomicInteger maxSeq = new AtomicInteger(0);
 
         try (Stream<Path> stream = Files.list(uploadPath)) {
@@ -187,21 +185,15 @@ public class LogController {
                     .filter(name -> name.startsWith(todayPrefix))
                     .forEach(name -> {
                         try {
-                            // OCPP-LOG-ANALYSIS-20260328-0003.txt 에서 0003 추출
-                            String afterPrefix = name.substring(todayPrefix.length()); // 0003.txt
+                            String afterPrefix = name.substring(todayPrefix.length());
                             String seqStr = afterPrefix.contains(".")
-                                    ? afterPrefix.substring(0, afterPrefix.indexOf('.')) // 0003
+                                    ? afterPrefix.substring(0, afterPrefix.indexOf('.'))
                                     : afterPrefix;
                             int seq = Integer.parseInt(seqStr);
-                            if (seq > maxSeq.get()) {
-                                maxSeq.set(seq);
-                            }
-                        } catch (NumberFormatException ignored) {
-                            // 패턴 불일치 파일 무시
-                        }
+                            if (seq > maxSeq.get()) maxSeq.set(seq);
+                        } catch (NumberFormatException ignored) {}
                     });
         }
-
-        return maxSeq.get() + 1;  // 최대 시퀀스 + 1
+        return maxSeq.get() + 1;
     }
 }

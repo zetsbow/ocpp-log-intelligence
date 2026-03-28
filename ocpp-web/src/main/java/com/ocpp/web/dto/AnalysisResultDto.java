@@ -11,9 +11,6 @@ public class AnalysisResultDto {
     /** 분석 세션 ID (PK, CHAR(13)) — 예: 20260328-0001 */
     private String        sessionId;
 
-    /** 로그 파일 키 (예: 20260328-0001) */
-    private String        logKey;
-
     private String        chargerId;
     private LocalDateTime analyzedAt;
     private int           totalTransaction;

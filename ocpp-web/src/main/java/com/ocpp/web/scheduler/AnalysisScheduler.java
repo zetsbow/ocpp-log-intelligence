@@ -21,9 +21,6 @@ import java.util.List;
 
 /**
  * 기능1: 정기 배치 분석 스케줄러
- *
- * upload-dir 내 OCPP-LOG-ANALYSIS-* 패턴 파일을 순회하여
- * engine에 fileUrl 방식으로 분석 요청
  */
 @Slf4j
 @Component
@@ -40,7 +37,7 @@ public class AnalysisScheduler {
 
     private Path uploadPath;
 
-    private static final String FILE_PREFIX = "OCPP-LOG-ANALYSIS";
+    private static final String FILE_PREFIX = "OCPP-LOG-ANALYSIS-";
 
     @PostConstruct
     public void init() throws IOException {
@@ -51,10 +48,6 @@ public class AnalysisScheduler {
         log.info("[AnalysisScheduler] 업로드 경로 초기화: {}", uploadPath);
     }
 
-    /**
-     * 매일 자정 실행
-     * 데모 시: @Scheduled(fixedRate = 60000) 으로 교체
-     */
     @Scheduled(cron = "0 0 0 * * *")
     // @Scheduled(fixedRate = 60000)
     public void runDailyAnalysis() {
@@ -66,11 +59,10 @@ public class AnalysisScheduler {
         }
 
         try (var stream = Files.list(uploadPath)) {
-            // OCPP-LOG-ANALYSIS-* 패턴 파일만 대상
             List<Path> logFiles = stream
                     .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().startsWith(FILE_PREFIX))
-                    .sorted()  // 날짜-시퀀스 순 정렬
+                    .sorted()
                     .toList();
 
             if (logFiles.isEmpty()) {
@@ -92,21 +84,41 @@ public class AnalysisScheduler {
     private void analyzeFile(Path file) {
         String fileName = file.getFileName().toString();
         try {
+            // sessionId 추출: OCPP-LOG-ANALYSIS-20260328-0001.txt → 20260328-0001
+            String sessionId = extractSessionId(fileName);
+
             String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
             String fileUrl = webBaseUrl + "/log/upload/" + encodedFileName;
 
-            log.info("[기능1] 분석 요청 - fileName={}, fileUrl={}", fileName, fileUrl);
+            log.info("[기능1] 분석 요청 - sessionId={}, fileName={}", sessionId, fileName);
 
             AnalyzeRequestDto req = new AnalyzeRequestDto();
+            req.setSessionId(sessionId);
             req.setFileUrl(fileUrl);
             req.setFileName(fileName);
 
             AnalysisResultDto result = engineClient.analyzeBatch(req);
-            log.info("[기능1] 분석 완료 - file={}, 메시지={}, 장애={}",
-                    fileName, result.getTotalMsgCount(), result.getFaultCount());
+            log.info("[기능1] 분석 완료 - sessionId={}, 트랜잭션={}, 장애={}",
+                    result.getSessionId(),
+                    result.getTotalTransaction(),
+                    result.getFaultTransactionCount());
 
         } catch (Exception e) {
             log.error("[기능1] 분석 실패 - file={}, error={}", fileName, e.getMessage());
         }
+    }
+
+    /**
+     * 파일명에서 sessionId 추출
+     * OCPP-LOG-ANALYSIS-20260328-0001.txt → 20260328-0001
+     */
+    private String extractSessionId(String fileName) {
+        String nameWithoutExt = fileName.contains(".")
+                ? fileName.substring(0, fileName.lastIndexOf('.'))
+                : fileName;
+        if (nameWithoutExt.startsWith(FILE_PREFIX)) {
+            return nameWithoutExt.substring(FILE_PREFIX.length());
+        }
+        return nameWithoutExt;
     }
 }

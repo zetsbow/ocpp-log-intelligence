@@ -59,7 +59,7 @@
       <table class="table table-hover mb-0" th:if="${history != null and !history.isEmpty()}">
         <thead class="table-light">
           <tr>
-            <th>로그 키</th>
+            <th>세션 ID</th>
             <th>분석 일시</th>
             <th>충전기 ID</th>
             <th>파일명</th>
@@ -73,7 +73,7 @@
           <tr th:each="h : ${history}">
             <td>
               <span class="badge bg-secondary font-monospace"
-                    th:text="${h.logKey} ?: '-'">-</span>
+                    th:text="${h.sessionId} ?: '-'">-</span>
             </td>
             <td th:text="${#temporals.format(h.analyzedAt,'MM-dd HH:mm')}">-</td>
             <td><code th:text="${h.chargerId} ?: '전체'">-</code></td>
@@ -103,7 +103,7 @@
   const history = /*[[${history}]]*/ [];
   if (history && history.length > 0) {
     const labels = history.slice(0,10).reverse()
-        .map(h => h.logKey || (h.analyzedAt ? h.analyzedAt.substring(5,16) : '-'));
+        .map(h => h.sessionId || (h.analyzedAt ? h.analyzedAt.substring(5,16) : '-'));
     const faults = history.slice(0,10).reverse().map(h => h.faultTransactionCount || 0);
     const totals = history.slice(0,10).reverse().map(h => h.totalTransaction || 0);
     new Chart(document.getElementById('faultChart'), {

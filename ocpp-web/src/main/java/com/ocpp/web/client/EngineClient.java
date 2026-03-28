@@ -22,7 +22,7 @@ public class EngineClient {
 
     private final RestTemplate restTemplate;
 
-    @Value("${engine.url:http://localhost:7778}")
+    @Value("${engine.url:http://127.0.0.1:7778}")
     private String engineUrl;
 
     public EngineClient() {
@@ -37,20 +37,21 @@ public class EngineClient {
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log.info("[EngineClient] POST {}", url);
         log.info("[EngineClient] 요청 파라미터");
-        log.info("  ├─ chargerId  : {}", isBlank(request.getChargerId())  ? "(전체 분석)" : request.getChargerId());
-        log.info("  ├─ fromTime   : {}", request.getFromTime()  != null   ? request.getFromTime()  : "(제한 없음)");
-        log.info("  ├─ toTime     : {}", request.getToTime()    != null   ? request.getToTime()    : "(제한 없음)");
-        log.info("  ├─ fileName   : {}", isBlank(request.getFileName())   ? "(없음)" : request.getFileName());
-        log.info("  ├─ fileUrl    : {}", isBlank(request.getFileUrl())    ? "(없음)" : request.getFileUrl());
+        log.info("  ├─ chargerId  : {}", isBlank(request.getChargerId()) ? "(전체 분석)" : request.getChargerId());
+        log.info("  ├─ fromTime   : {}", request.getFromTime() != null   ? request.getFromTime()  : "(제한 없음)");
+        log.info("  ├─ toTime     : {}", request.getToTime()   != null   ? request.getToTime()    : "(제한 없음)");
+        log.info("  ├─ fileName   : {}", isBlank(request.getFileName())  ? "(없음)" : request.getFileName());
+        log.info("  ├─ fileUrl    : {}", isBlank(request.getFileUrl())   ? "(없음)" : request.getFileUrl());
         log.info("  └─ logContent : {}", request.getLogContent() != null
                 ? request.getLogContent().length() + " bytes" : "(없음)");
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         try {
             AnalysisResultDto result = post(url, request, AnalysisResultDto.class);
-            log.info("[EngineClient] 응답 수신 - totalMsgCount={}, faultCount={}",
-                    result != null ? result.getTotalMsgCount() : "null",
-                    result != null ? result.getFaultCount()    : "null");
+            log.info("[EngineClient] 응답 수신 - sessionId={}, totalTransaction={}, faultTransactionCount={}",
+                    result != null ? result.getSessionId()             : "null",
+                    result != null ? result.getTotalTransaction()      : "null",
+                    result != null ? result.getFaultTransactionCount() : "null");
             return result;
         } catch (RestClientException e) {
             log.error("[EngineClient] engine 호출 실패 - url={}, error={}", url, e.getMessage());
@@ -63,11 +64,21 @@ public class EngineClient {
 
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log.info("[EngineClient] POST {} (배치)", url);
-        log.info("  ├─ fileName   : {}", isBlank(request.getFileName()) ? "(없음)" : request.getFileName());
-        log.info("  └─ fileUrl    : {}", isBlank(request.getFileUrl())  ? "(없음)" : request.getFileUrl());
+        log.info("  ├─ fileName : {}", isBlank(request.getFileName()) ? "(없음)" : request.getFileName());
+        log.info("  └─ fileUrl  : {}", isBlank(request.getFileUrl())  ? "(없음)" : request.getFileUrl());
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-        return post(url, request, AnalysisResultDto.class);
+        try {
+            AnalysisResultDto result = post(url, request, AnalysisResultDto.class);
+            log.info("[EngineClient] 배치 응답 수신 - sessionId={}, totalTransaction={}, faultTransactionCount={}",
+                    result != null ? result.getSessionId()             : "null",
+                    result != null ? result.getTotalTransaction()      : "null",
+                    result != null ? result.getFaultTransactionCount() : "null");
+            return result;
+        } catch (RestClientException e) {
+            log.error("[EngineClient] 배치 engine 호출 실패 - url={}, error={}", url, e.getMessage());
+            throw e;
+        }
     }
 
     public List<AnalysisResultDto> getHistory(int limit) {
