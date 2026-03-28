@@ -17,27 +17,22 @@
         <result property="detailText"    column="detail_text"/>
     </resultMap>
 
-    <!-- sessionId로 트랜잭션 상세 목록 조회 (전체) -->
-    <select id="findBySessionId" resultMap="rm">
-        SELECT
-            id,
-            session_id,
-            IFNULL(message_id, '') AS message_id,
-            transaction_id,
-            charger_id,
-            log_timestamp,
-            action,
-            message_type,
-            direction,
-            status,
-            detail_text
-        FROM transaction_detail
+    <!-- 공통 WHERE 절 -->
+    <sql id="searchWhere">
         WHERE session_id = #{sessionId}
-        ORDER BY id ASC
-    </select>
+        <if test="chargerId != null and chargerId != ''">
+            AND charger_id = #{chargerId}
+        </if>
+        <if test="action != null and action != ''">
+            AND action LIKE CONCAT('%', #{action}, '%')
+        </if>
+        <if test="direction != null and direction != ''">
+            AND direction = #{direction}
+        </if>
+    </sql>
 
-    <!-- sessionId로 트랜잭션 상세 목록 조회 (페이징) -->
-    <select id="findBySessionIdPaged" resultMap="rm">
+    <!-- 검색조건 + 페이징 조회 -->
+    <select id="findByConditionPaged" resultMap="rm">
         SELECT
             id,
             session_id,
@@ -51,14 +46,16 @@
             status,
             detail_text
         FROM transaction_detail
-        WHERE session_id = #{sessionId}
+        <include refid="searchWhere"/>
         ORDER BY id ASC
         LIMIT #{size} OFFSET #{offset}
     </select>
 
-    <!-- sessionId 총 건수 조회 -->
-    <select id="countBySessionId" resultType="int">
-        SELECT COUNT(*) FROM transaction_detail WHERE session_id = #{sessionId}
+    <!-- 검색조건 총 건수 조회 -->
+    <select id="countByCondition" resultType="int">
+        SELECT COUNT(*)
+        FROM transaction_detail
+        <include refid="searchWhere"/>
     </select>
 
 </mapper>

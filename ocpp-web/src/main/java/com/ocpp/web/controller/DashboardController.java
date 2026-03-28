@@ -54,11 +54,19 @@ public class DashboardController {
 
     @GetMapping("/dashboard/detail/{sessionId}")
     public String detail(@PathVariable String sessionId,
-                         @RequestParam(defaultValue = "1") int page,
-                         @RequestParam(defaultValue = "20") int size,
+                         @RequestParam(defaultValue = "1")  int    page,
+                         @RequestParam(defaultValue = "20") int    size,
+                         @RequestParam(defaultValue = "")   String chargerId,
+                         @RequestParam(defaultValue = "")   String action,
+                         @RequestParam(defaultValue = "")   String direction,
                          Model model) {
         model.addAttribute("currentMenu", "dashboard");
-        model.addAttribute("sessionId", sessionId);
+        model.addAttribute("sessionId",  sessionId);
+        // 검색 조건 유지 (폼 복원용)
+        model.addAttribute("srchChargerId", chargerId);
+        model.addAttribute("srchAction",    action);
+        model.addAttribute("srchDirection", direction);
+        model.addAttribute("pageSize",      size);
 
         // 분석 결과 요약 — ocpp-web 자체 DB 직접 조회
         try {
@@ -69,35 +77,33 @@ public class DashboardController {
             model.addAttribute("result", null);
         }
 
-        // 트랜잭션 상세 — 페이징 조회
+        // 트랜잭션 상세 — 검색 조건 + 페이징 조회
         try {
-            int totalCount  = transactionDetailService.countBySessionId(sessionId);
+            int totalCount  = transactionDetailService.count(sessionId, chargerId, action, direction);
             int totalPages  = (int) Math.ceil((double) totalCount / size);
             int currentPage = Math.max(1, Math.min(page, Math.max(totalPages, 1)));
 
-            List<OcppFlowEntryDto> details = transactionDetailService.getBySessionIdPaged(sessionId, currentPage, size);
+            List<OcppFlowEntryDto> details =
+                    transactionDetailService.search(sessionId, chargerId, action, direction, currentPage, size);
+
             log.info("[DashboardController] 트랜잭션 상세 조회 완료 - sessionId={}, page={}/{}, 건수={}",
                     sessionId, currentPage, totalPages, details.size());
 
-            int startRow = (currentPage - 1) * size + 1;  // 현재 페이지 시작 행 번호
-
-            model.addAttribute("details",      details);
-            model.addAttribute("currentPage",  currentPage);
-            model.addAttribute("totalPages",   totalPages);
-            model.addAttribute("totalCount",   totalCount);
-            model.addAttribute("pageSize",     size);
-            model.addAttribute("startRow",     startRow);
-            model.addAttribute("hasPrev",      currentPage > 1);
-            model.addAttribute("hasNext",      currentPage < totalPages);
-            model.addAttribute("prevPage",     currentPage - 1);
-            model.addAttribute("nextPage",     currentPage + 1);
-
-            // 페이지 그룹 (최대 10개 표시)
             int pageGroupSize = 10;
             int pageStart = ((currentPage - 1) / pageGroupSize) * pageGroupSize + 1;
-            int pageEnd   = Math.min(pageStart + pageGroupSize - 1, totalPages);
-            model.addAttribute("pageStart", pageStart);
-            model.addAttribute("pageEnd",   pageEnd);
+            int pageEnd   = Math.min(pageStart + pageGroupSize - 1, Math.max(totalPages, 1));
+
+            model.addAttribute("details",     details);
+            model.addAttribute("currentPage", currentPage);
+            model.addAttribute("totalPages",  totalPages);
+            model.addAttribute("totalCount",  totalCount);
+            model.addAttribute("startRow",    (currentPage - 1) * size + 1);
+            model.addAttribute("hasPrev",     currentPage > 1);
+            model.addAttribute("hasNext",     currentPage < totalPages);
+            model.addAttribute("prevPage",    currentPage - 1);
+            model.addAttribute("nextPage",    currentPage + 1);
+            model.addAttribute("pageStart",   pageStart);
+            model.addAttribute("pageEnd",     pageEnd);
 
         } catch (Exception e) {
             log.error("[DashboardController] 트랜잭션 상세 조회 실패 - sessionId={}, error={}", sessionId, e.getMessage(), e);

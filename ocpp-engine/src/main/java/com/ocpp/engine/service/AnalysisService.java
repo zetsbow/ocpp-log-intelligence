@@ -163,26 +163,35 @@ public class AnalysisService {
     // ── 흐름 요약 ────────────────────────────────────────────────────────────
 
     private List<OcppFlowEntry> buildFlowEntries(List<OcppMessage> messages, String fallbackChargerId) {
-        // Call uniqueId → displayAction 매핑
-        Map<String, String> uidToDisplay = messages.stream()
-                .filter(OcppMessage::isCall)
-                .filter(m -> m.getUniqueId() != null)
-                .collect(Collectors.toMap(
-                        OcppMessage::getUniqueId,
-                        OcppMessage::getDisplayAction,
-                        (a, b) -> a));
 
-        // Pre-scan: StartTransaction CallResult uid → transactionId
+        // ── Pre-scan 1: Call uniqueId → action 매핑 ──────────────────────────
+        Map<String, String> uidToAction = new HashMap<>();     // uniqueId → raw action
+        Map<String, String> uidToDisplay = new HashMap<>();    // uniqueId → displayAction
+        for (OcppMessage msg : messages) {
+            if (msg.isCall() && msg.getUniqueId() != null) {
+                uidToAction.put(msg.getUniqueId(), msg.getAction());
+                uidToDisplay.put(msg.getUniqueId(), msg.getDisplayAction());
+            }
+        }
+
+        // ── Pre-scan 2: StartTransaction CallResult uid → transactionId 매핑 ─
+        // StartTransaction CallResult payload: {"transactionId": 123, "idTagInfo":{...}}
         Map<String, String> uidToTxId = new HashMap<>();
         for (OcppMessage msg : messages) {
-            if (msg.isCallResult() && msg.getTransactionId() != null
-                    && "StartTransaction".equals(uidToDisplay.get(msg.getUniqueId()))) {
+            if (msg.isCallResult()
+                    && msg.getUniqueId() != null
+                    && msg.getTransactionId() != null
+                    && "StartTransaction".equals(uidToAction.get(msg.getUniqueId()))) {
                 uidToTxId.put(msg.getUniqueId(), msg.getTransactionId());
             }
         }
 
+        // ── Pre-scan 3: StartTransaction Call uniqueId → transactionId 역매핑 ─
+        // StartTransaction Call 행 자체에도 txId를 붙이기 위해
+        // (Call의 uniqueId == CallResult의 uniqueId 이므로 동일 키 사용)
+
         List<OcppFlowEntry> entries = new ArrayList<>();
-        String activeTxId = null;
+        String activeTxId = null;   // 현재 진행 중인 transactionId
 
         for (OcppMessage msg : messages) {
             OcppFlowEntry e = new OcppFlowEntry();
@@ -190,46 +199,62 @@ public class AnalysisService {
             e.setTimestamp(msg.getTimestamp() != null ? msg.getTimestamp().format(TS_FMT) : "");
             e.setChargerId(msg.getChargerId() != null ? msg.getChargerId() : fallbackChargerId);
 
-            String resolvedAction = msg.isCall()
+            // 이 메시지의 action (Call이면 직접, CallResult/Error이면 uidToAction으로 역조회)
+            String rawAction = msg.isCall()
                     ? msg.getAction()
-                    : uidToDisplay.getOrDefault(msg.getUniqueId(), "");
+                    : uidToAction.getOrDefault(msg.getUniqueId(), "");
 
             if (msg.isCall()) {
+                // ── Call 처리 ──────────────────────────────────────────────
                 e.setAction(msg.getDisplayAction());
                 e.setMessageType("Call");
                 e.setDirection("CP→CS");
-                e.setDetail(msg.getPayloadDetail());
                 e.setDetailText(toDetailText(msg.getPayloadDetail()));
 
+                if ("StartTransaction".equals(rawAction)) {
+                    // StartTransaction Call: transactionId는 pre-scan으로 확보
+                    String txId = uidToTxId.get(msg.getUniqueId());
+                    e.setTransactionId(txId);
+                } else if ("StopTransaction".equals(rawAction)) {
+                    // StopTransaction에는 payload에 transactionId 있음
+                    e.setTransactionId(msg.getTransactionId() != null
+                            ? msg.getTransactionId() : activeTxId);
+                } else {
+                    e.setTransactionId(activeTxId);
+                }
+
             } else if (msg.isCallResult()) {
+                // ── CallResult 처리 ────────────────────────────────────────
                 e.setAction(uidToDisplay.getOrDefault(msg.getUniqueId(), "Unknown"));
                 e.setMessageType("CallResult");
                 e.setDirection("CS→CP");
                 e.setStatus(msg.getStatus());
-                if ("StartTransaction".equals(resolvedAction) && msg.getTransactionId() != null) {
-                    Map<String, String> d = new LinkedHashMap<>();
-                    d.put("transactionId", msg.getTransactionId());
-                    e.setDetail(d);
-                    e.setDetailText("transactionId=" + msg.getTransactionId());
+
+                if ("StartTransaction".equals(rawAction)) {
+                    // StartTransaction CallResult: transactionId 확정 → activeTxId 갱신
+                    String txId = msg.getTransactionId();
+                    if (txId != null) {
+                        activeTxId = txId;
+                        uidToTxId.put(msg.getUniqueId(), txId);   // 재확인용 갱신
+                    }
+                    e.setTransactionId(activeTxId);
+                    // detailText에 transactionId 표시
+                    if (activeTxId != null) e.setDetailText("transactionId=" + activeTxId);
+
+                } else if ("StopTransaction".equals(rawAction)) {
+                    e.setTransactionId(activeTxId);
+                    activeTxId = null;   // 트랜잭션 종료
+
+                } else {
+                    e.setTransactionId(activeTxId);
                 }
 
             } else {
+                // ── CallError 처리 ─────────────────────────────────────────
                 e.setAction(uidToDisplay.getOrDefault(msg.getUniqueId(), "Unknown"));
                 e.setMessageType("CallError");
                 e.setDirection("CS→CP");
                 e.setStatus(msg.getStatus());
-            }
-
-            // transactionId 결정
-            if (msg.isCall() && "StartTransaction".equals(resolvedAction)) {
-                e.setTransactionId(uidToTxId.get(msg.getUniqueId()));
-            } else if (msg.isCallResult() && "StartTransaction".equals(resolvedAction)) {
-                if (msg.getTransactionId() != null) activeTxId = msg.getTransactionId();
-                e.setTransactionId(activeTxId);
-            } else if ("StopTransaction".equals(resolvedAction)) {
-                e.setTransactionId(activeTxId);
-                if (msg.isCallResult()) activeTxId = null;
-            } else {
                 e.setTransactionId(activeTxId);
             }
 

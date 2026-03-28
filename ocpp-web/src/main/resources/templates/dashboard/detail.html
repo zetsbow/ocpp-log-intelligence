@@ -193,6 +193,58 @@
             th:text="${totalCount != null} ? ${totalCount} + '건' : '0건'">0건</span>
     </div>
 
+    <!-- ── 검색 폼 ───────────────────────────────────────── -->
+    <div style="padding:.85rem 1.3rem;border-bottom:1px solid #f0f4f8;background:#fafbfc">
+      <form method="get" th:action="@{/dashboard/detail/{sid}(sid=${sessionId})}"
+            class="row g-2 align-items-end">
+        <input type="hidden" name="page" value="1"/>
+        <input type="hidden" name="size" th:value="${pageSize}"/>
+
+        <!-- 충전기 ID -->
+        <div class="col-sm-6 col-md-3">
+          <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase;letter-spacing:.05em">
+            충전기 ID
+          </label>
+          <input type="text" name="chargerId" class="form-control form-control-sm"
+                 placeholder="충전기 ID 입력"
+                 th:value="${srchChargerId}"/>
+        </div>
+
+        <!-- 액션 -->
+        <div class="col-sm-6 col-md-3">
+          <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase;letter-spacing:.05em">
+            액션 (Action)
+          </label>
+          <input type="text" name="action" class="form-control form-control-sm"
+                 placeholder="예) Heartbeat, StartTransaction"
+                 th:value="${srchAction}"/>
+        </div>
+
+        <!-- 방향 -->
+        <div class="col-sm-6 col-md-3">
+          <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;color:#78909c;text-transform:uppercase;letter-spacing:.05em">
+            방향 (Direction)
+          </label>
+          <select name="direction" class="form-select form-select-sm">
+            <option value="" th:selected="${srchDirection == ''}">전체</option>
+            <option value="CP→CS" th:selected="${srchDirection == 'CP→CS'}">CP→CS</option>
+            <option value="CS→CP" th:selected="${srchDirection == 'CS→CP'}">CS→CP</option>
+          </select>
+        </div>
+
+        <!-- 버튼 -->
+        <div class="col-sm-6 col-md-3 d-flex gap-2">
+          <button type="submit" class="btn btn-sm btn-primary flex-fill">
+            <i class="bi bi-search me-1"></i>검색
+          </button>
+          <a th:href="@{/dashboard/detail/{sid}(sid=${sessionId})}"
+             class="btn btn-sm btn-outline-secondary flex-fill">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
+          </a>
+        </div>
+      </form>
+    </div>
+
     <!-- 빈 상태 -->
     <div th:if="${details == null or details.isEmpty()}" class="empty-state">
       <i class="bi bi-inbox"></i>
@@ -207,11 +259,11 @@
             <th style="width:50px">#</th>
             <th>트랜잭션 ID</th>
             <th>충전기</th>
-            <th>타임스탬프</th>
+            <th>서버시간</th>
             <th>액션(Action)</th>
             <th>메시지 유형</th>
             <th>방향</th>
-            <th>상태</th>
+            <th>타임스탬프</th>
             <th>상세 정보</th>
           </tr>
         </thead>
@@ -281,20 +333,16 @@
       <nav>
         <ul class="pagination pagination-sm mb-0">
 
-          <!-- 이전 그룹 (◀◀) -->
+          <!-- 이전 그룹 -->
           <li class="page-item" th:if="${pageStart > 1}">
             <a class="page-link"
-               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${pageStart - 1}, size=${pageSize})}">
-              «
-            </a>
+               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${pageStart - 1}, size=${pageSize}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection})}">«</a>
           </li>
 
-          <!-- 이전 페이지 (◀) -->
+          <!-- 이전 페이지 -->
           <li class="page-item" th:classappend="${!hasPrev} ? 'disabled'">
             <a class="page-link"
-               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${prevPage}, size=${pageSize})}">
-              ‹
-            </a>
+               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${prevPage}, size=${pageSize}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection})}">‹</a>
           </li>
 
           <!-- 페이지 번호 -->
@@ -302,24 +350,20 @@
               th:each="p : ${#numbers.sequence(pageStart, pageEnd)}"
               th:classappend="${p == currentPage} ? 'active'">
             <a class="page-link"
-               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${p}, size=${pageSize})}"
+               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${p}, size=${pageSize}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection})}"
                th:text="${p}">1</a>
           </li>
 
-          <!-- 다음 페이지 (▶) -->
+          <!-- 다음 페이지 -->
           <li class="page-item" th:classappend="${!hasNext} ? 'disabled'">
             <a class="page-link"
-               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${nextPage}, size=${pageSize})}">
-              ›
-            </a>
+               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${nextPage}, size=${pageSize}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection})}">›</a>
           </li>
 
-          <!-- 다음 그룹 (▶▶) -->
+          <!-- 다음 그룹 -->
           <li class="page-item" th:if="${pageEnd < totalPages}">
             <a class="page-link"
-               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${pageEnd + 1}, size=${pageSize})}">
-              »
-            </a>
+               th:href="@{/dashboard/detail/{sid}(sid=${sessionId}, page=${pageEnd + 1}, size=${pageSize}, chargerId=${srchChargerId}, action=${srchAction}, direction=${srchDirection})}">»</a>
           </li>
 
         </ul>
@@ -329,7 +373,8 @@
       <div style="font-size:.8rem;color:#90a4ae;display:flex;align-items:center;gap:6px">
         페이지당
         <select class="form-select form-select-sm" style="width:70px"
-                onchange="location.href='/dashboard/detail/' + '[[${sessionId}]]' + '?page=1&size=' + this.value">
+                onchange="location.href='/dashboard/detail/[[${sessionId}]]?page=1&size=' + this.value
+                    + '&chargerId=[[${srchChargerId}]]&action=[[${srchAction}]]&direction=' + encodeURIComponent('[[${srchDirection}]]')">
           <option th:value="10"  th:selected="${pageSize == 10}">10</option>
           <option th:value="20"  th:selected="${pageSize == 20}">20</option>
           <option th:value="50"  th:selected="${pageSize == 50}">50</option>
