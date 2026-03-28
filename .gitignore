@@ -17,20 +17,6 @@ mvnw.cmd
 *.iml
 *.ipr
 out/
-.idea/modules.xml
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/dictionaries
-.idea/vcs.xml
-.idea/jsLibraryMappings.xml
-.idea/datasources.xml
-.idea/dataSources.ids
-.idea/sqlDataSources.xml
-.idea/dynamic.xml
-.idea/uiDesigner.xml
-.idea/gradle.xml
-.idea/libraries
-.idea/shelf
 
 # ── Spring Boot ──────────────────────────────────────────────
 **/application-local.yml
@@ -47,17 +33,15 @@ secrets.properties
 *.p12
 *.jks
 
-# ── 업로드된 OCPP 로그 파일 (디렉토리 구조는 유지, 실제 파일만 제외) ──
-ocpp-web/logs/upload/*.log
-ocpp-web/logs/upload/*.txt
-ocpp-web/logs/upload/*.ocpp
-# .gitkeep은 제외하지 않음 (디렉토리 구조 유지용)
-!ocpp-web/logs/upload/.gitkeep
+# ── 업로드 로그 파일 ──────────────────────────────────────────
+# logs/upload 폴더 안의 모든 파일 제외
+# 단, 디렉토리 구조 유지를 위한 .gitkeep은 예외
+**/logs/upload/*
+!**/logs/upload/.gitkeep
 
-# ── 일반 로그 파일 ────────────────────────────────────────────
+# ── 애플리케이션 로그 ─────────────────────────────────────────
 *.log
 log/
-/ocpp-engine/logs/
 
 # ── OS 파일 ──────────────────────────────────────────────────
 .DS_Store
