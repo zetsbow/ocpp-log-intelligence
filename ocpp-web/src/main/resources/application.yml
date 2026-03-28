@@ -38,11 +38,10 @@ mybatis:
 engine:
   url: http://localhost:7778
 
-# 업로드된 로그 파일이 저장될 서버 경로 (engine과 공유)
 ocpp:
   log:
+    # web과 engine이 동일 서버에 있으므로 같은 경로 공유
     upload-dir: C:/ocpp-logs/upload
-    archive-dir: C:/ocpp-logs/archive
 
 logging:
   level:

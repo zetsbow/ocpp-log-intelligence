@@ -21,7 +21,13 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
- * 기능2: 로그 파일 업로드 → 서버 경로 저장 → engine 분석 요청
+ * 로그 분석 컨트롤러
+ *
+ * [동작 방식 - 동일 서버]
+ * 1. 사용자가 파일 업로드
+ * 2. web 서버가 공유 경로(C:/ocpp-logs/upload)에 파일 저장
+ * 3. engine에 저장된 파일의 절대 경로만 전달
+ * 4. engine이 동일 경로에서 직접 파일 읽어 분석
  */
 @Slf4j
 @Controller
@@ -40,10 +46,6 @@ public class LogController {
         return "log/analyze";
     }
 
-    /**
-     * 1) 업로드 파일을 서버 경로에 저장
-     * 2) engine에 파일 경로 + 필터 조건 전달 → 분석 결과 반환
-     */
     @PostMapping("/analyze")
     public String analyze(
             @RequestParam(required = false) String chargerId,
@@ -62,30 +64,21 @@ public class LogController {
         }
 
         try {
-            // 1. 업로드 디렉토리 생성 (없으면 자동 생성)
-            Path uploadPath = Paths.get(uploadDir);
-            Files.createDirectories(uploadPath);
+            // 1. 공유 경로에 파일 저장
+            Path savedPath = saveUploadedFile(logFile);
+            log.info("[LogController] 파일 저장 완료: {}", savedPath);
 
-            // 2. 파일명 중복 방지: 타임스탬프 prefix
-            String originalName = logFile.getOriginalFilename();
-            String timestamp    = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-            String savedName    = timestamp + "_" + originalName;
-            Path   savedPath    = uploadPath.resolve(savedName);
-
-            // 3. 서버 경로에 저장
-            Files.copy(logFile.getInputStream(), savedPath, StandardCopyOption.REPLACE_EXISTING);
-            log.info("[LogController] 파일 저장 완료: {}", savedPath.toAbsolutePath());
-
-            // 4. engine에 파일 경로 + 조건 전달 (파일 내용 미전송)
+            // 2. engine에 파일 경로 + 필터 조건 전달
             AnalyzeRequestDto req = new AnalyzeRequestDto();
             req.setChargerId(chargerId);
             req.setFromTime(fromTime);
             req.setToTime(toTime);
             req.setFilePath(savedPath.toAbsolutePath().toString());
-            req.setFileName(originalName);
+            req.setFileName(logFile.getOriginalFilename());
 
+            // 3. 분석 결과 수신
             AnalysisResultDto result = engineClient.analyzeCharger(req);
-            model.addAttribute("result",    result);
+            model.addAttribute("result", result);
             model.addAttribute("savedPath", savedPath.toAbsolutePath().toString());
 
         } catch (IOException e) {
@@ -96,5 +89,22 @@ public class LogController {
             model.addAttribute("error", "분석 실패: " + e.getMessage());
         }
         return "log/result";
+    }
+
+    /**
+     * 업로드 파일을 공유 경로에 저장
+     * 파일명 중복 방지를 위해 타임스탬프 prefix 추가
+     */
+    private Path saveUploadedFile(MultipartFile file) throws IOException {
+        Path uploadPath = Paths.get(uploadDir);
+        Files.createDirectories(uploadPath);  // 디렉토리 없으면 자동 생성
+
+        String timestamp = LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String savedName = timestamp + "_" + file.getOriginalFilename();
+        Path savedPath   = uploadPath.resolve(savedName);
+
+        Files.copy(file.getInputStream(), savedPath, StandardCopyOption.REPLACE_EXISTING);
+        return savedPath;
     }
 }
