@@ -10,9 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 기능3: 장애 패턴 등록·관리 화면
- */
 @Slf4j
 @Controller
 @RequestMapping("/pattern")
@@ -21,32 +18,30 @@ public class PatternViewController {
 
     private final EngineClient engineClient;
 
-    /** 패턴 목록 */
     @GetMapping
     public String list(Model model) {
+        model.addAttribute("currentMenu", "pattern");
         List<FaultPatternDto> patterns = engineClient.getPatterns();
         model.addAttribute("patterns", patterns);
         return "pattern/list";
     }
 
-    /** 패턴 등록 폼 */
     @GetMapping("/new")
     public String newForm(Model model) {
+        model.addAttribute("currentMenu", "pattern");
         model.addAttribute("pattern", new FaultPatternDto());
         model.addAttribute("mode", "new");
         return "pattern/form";
     }
 
-    /** 패턴 수정 폼 */
     @GetMapping("/{id}/edit")
     public String editForm(@PathVariable Long id, Model model) {
-        FaultPatternDto pattern = engineClient.getPattern(id);
-        model.addAttribute("pattern", pattern);
+        model.addAttribute("currentMenu", "pattern");
+        model.addAttribute("pattern", engineClient.getPattern(id));
         model.addAttribute("mode", "edit");
         return "pattern/form";
     }
 
-    /** 패턴 저장 (등록 / 수정) */
     @PostMapping("/save")
     public String save(@ModelAttribute FaultPatternDto pattern) {
         if (pattern.getId() == null) {
@@ -59,7 +54,6 @@ public class PatternViewController {
         return "redirect:/pattern";
     }
 
-    /** 패턴 삭제 */
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable Long id) {
         engineClient.deletePattern(id);
