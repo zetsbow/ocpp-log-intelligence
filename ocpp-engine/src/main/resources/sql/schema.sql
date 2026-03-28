@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS fault_pattern (
 -- session_id: CHAR(13) PK — ocpp-web에서 파일명으로부터 추출하여 전달
 --             파일명: OCPP-LOG-ANALYSIS-20260328-0001.txt → session_id: 20260328-0001
 CREATE TABLE IF NOT EXISTS analysis_result (
-    session_id               CHAR(13)      NOT NULL COMMENT '분석 세션 ID (예: 20260328-0001)',
+    session_id               VARCHAR(50)   NOT NULL COMMENT '분석 세션 ID (예: 20260328-0001)',
     charger_id               VARCHAR(100)           COMMENT '충전기 ID (NULL이면 전체 배치)',
     analyzed_at              DATETIME      NOT NULL DEFAULT NOW(),
     total_transaction        INT           NOT NULL DEFAULT 0  COMMENT '전체 트랜잭션 수',
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS analysis_result (
 -- 기능2: 탐지된 장애
 CREATE TABLE IF NOT EXISTS fault_detection (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-    analysis_id     CHAR(13)               COMMENT '분석 이력 FK (analysis_result.session_id)',
+    analysis_id     VARCHAR(50)            COMMENT '분석 이력 FK (analysis_result.session_id)',
     charger_id      VARCHAR(100)  NOT NULL,
     pattern_id      BIGINT                 COMMENT '매칭된 패턴 FK',
     transaction_id  VARCHAR(100)           COMMENT '관련 트랜잭션 ID',

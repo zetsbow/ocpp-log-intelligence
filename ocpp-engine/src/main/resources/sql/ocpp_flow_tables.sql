@@ -34,3 +34,13 @@ CREATE TABLE IF NOT EXISTS flow_violation (
     PRIMARY KEY (id),
     KEY idx_session_id (session_id)
 );
+
+-- ============================================================
+--  기존 DB 컬럼 확장 (이미 테이블이 있는 경우 반드시 실행)
+--  CHAR(13) → VARCHAR(50) : sessionId 길이 제한 오류 해결
+-- ============================================================
+ALTER TABLE analysis_result
+    MODIFY COLUMN session_id VARCHAR(50) NOT NULL COMMENT '분석 세션 ID';
+
+ALTER TABLE fault_detection
+    MODIFY COLUMN analysis_id VARCHAR(50) COMMENT '분석 이력 FK (analysis_result.session_id)';

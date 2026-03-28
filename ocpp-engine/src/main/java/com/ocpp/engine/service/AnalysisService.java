@@ -43,13 +43,13 @@ public class AnalysisService {
 
         // 0. filePath로 파일 직접 읽기 (logContent가 없을 때)
         if ((request.getLogContent() == null || request.getLogContent().isBlank())
-                && request.getFilePath() != null && !request.getFilePath().isBlank()) {
+                && request.getFileUrl() != null && !request.getFileUrl().isBlank()) {
             try {
-                request.setLogContent(Files.readString(Paths.get(request.getFilePath())));
+                request.setLogContent(Files.readString(Paths.get(request.getFileUrl())));
                 if (request.getFileName() == null)
-                    request.setFileName(Paths.get(request.getFilePath()).getFileName().toString());
+                    request.setFileName(Paths.get(request.getFileUrl()).getFileName().toString());
             } catch (IOException e) {
-                throw new RuntimeException("로그 파일 읽기 실패: " + request.getFilePath(), e);
+                throw new RuntimeException("로그 파일 읽기 실패: " + request.getFileUrl(), e);
             }
         }
 
