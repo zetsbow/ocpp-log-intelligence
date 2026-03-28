@@ -65,25 +65,26 @@ public class AnalysisService {
         // 4. 세션 ID 추출 (파일명 마지막 _ 뒤 문자열)
         String sessionId = extractSessionId(request.getFileName());
 
-        // 5. transaction_count: StartTransaction Call 건수
-        int transactionCount = (int) filtered.stream()
-                .filter(OcppMessage::isCall)
-                .filter(m -> "StartTransaction".equals(m.getAction()))
-                .count();
+        // 5. total_transaction: 시작 신호(Preparing/Authorize/RemoteStartTransaction)가 있는 완전한 세션 건수
+        int transactionCount = countCompleteSessionStarts(filtered);
 
-        // 6. 흐름 검증 (위반 목록 - error_transaction_count 계산에 사용)
-        List<FlowViolation> violations = validateFlow(filtered, request.getChargerId());
+        // 6. charger_id: 파라미터 있으면 해당 값, 없으면 null (전체 분석)
+        final String resolvedChargerId = (request.getChargerId() != null && !request.getChargerId().isBlank())
+                ? request.getChargerId() : null;
 
-        // 7. error_transaction_count: 위반이 1건 이상인 transaction_id 건수
+        // 7. 흐름 검증 (위반 목록 - error_transaction_count 계산에 사용)
+        List<FlowViolation> violations = validateFlow(filtered, resolvedChargerId);
+
+        // 8. error_transaction_count: 위반이 1건 이상인 transaction_id 건수
         int errorTransactionCount = (int) violations.stream()
                 .map(FlowViolation::getTransactionId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .count();
 
-        // 8. 분석 이력 저장
+        // 9. 분석 이력 저장
         AnalysisResult result = new AnalysisResult();
-        result.setChargerId(request.getChargerId());
+        result.setChargerId(resolvedChargerId);
         result.setAnalyzedAt(LocalDateTime.now());
         result.setTotalTransaction(transactionCount);
         result.setFaultTransactionCount(errorTransactionCount);
@@ -94,8 +95,16 @@ public class AnalysisService {
         analysisResultMapper.insert(result);
 
         // 10. transaction_detail INSERT (max_allowed_packet 초과 방지를 위해 100건씩 분할)
-        List<OcppFlowEntry> flowEntries = buildFlowEntries(filtered, request.getChargerId());
-        flowEntries.forEach(e -> e.setSessionId(sessionId));
+        Set<String> faultTxIds = violations.stream()
+                .map(FlowViolation::getTransactionId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        List<OcppFlowEntry> flowEntries = buildFlowEntries(filtered, resolvedChargerId);
+        flowEntries.forEach(e -> {
+            e.setSessionId(sessionId);
+            e.setIsFault(e.getTransactionId() != null && faultTxIds.contains(e.getTransactionId()) ? "Y" : "N");
+        });
         for (int i = 0; i < flowEntries.size(); i += 100) {
             ocppFlowEntryMapper.insertAll(flowEntries.subList(i, Math.min(i + 100, flowEntries.size())));
         }
@@ -264,7 +273,7 @@ public class AnalysisService {
 
         checkHeartbeatInterval(calls, violations, chargerId, messages, uidToDisplay);
         checkFaultedStatus(calls, violations, chargerId, messages, uidToDisplay, uidToTxId);
-        checkChargingSessionFlow(calls, violations, chargerId, uidToTxId);
+        checkChargingSessionFlow(calls, violations, chargerId, uidToTxId, messages);
 
         return violations;
     }
@@ -320,18 +329,20 @@ public class AnalysisService {
                 .filter(m -> "StatusNotification".equals(m.getAction()))
                 .filter(m -> m.getPayloadDetail() != null
                         && "Faulted".equals(m.getPayloadDetail().get("status")))
-                .forEach(m -> addViolation(violations, "ERROR",
-                        m.getTimestamp(),
-                        "StatusNotification Faulted - errorCode="
-                                + m.getPayloadDetail().getOrDefault("errorCode", ""),
-                        chargerId,
-                        findActiveTxId(allMessages, uidToDisplay, m.getTimestamp()),
-                        m.getUniqueId()));
+                .forEach(m -> {
+                    String errorCode = m.getPayloadDetail().getOrDefault("errorCode", "");
+                    String vendorErrorCode = m.getPayloadDetail().getOrDefault("vendorErrorCode", "");
+                    String msg = "StatusNotification Faulted - errorCode=" + errorCode
+                            + (vendorErrorCode.isBlank() ? "" : ", vendorErrorCode=" + vendorErrorCode);
+                    addViolation(violations, "ERROR", m.getTimestamp(), msg, chargerId,
+                            findActiveTxId(allMessages, uidToDisplay, m.getTimestamp()), m.getUniqueId());
+                });
     }
 
     /** 충전 세션(StartTx→StopTx)별 KEVIT 흐름 검증 */
     private void checkChargingSessionFlow(List<OcppMessage> calls, List<FlowViolation> violations,
-                                           String chargerId, Map<String, String> uidToTxId) {
+                                           String chargerId, Map<String, String> uidToTxId,
+                                           List<OcppMessage> allMessages) {
         List<OcppMessage> startTxList = calls.stream()
                 .filter(m -> "StartTransaction".equals(m.getAction()))
                 .collect(Collectors.toList());
@@ -348,23 +359,19 @@ public class AnalysisService {
             String sessionLabel    = String.format("세션%d(%s)", i + 1, stTs.format(TS_FMT));
             String txId            = uidToTxId.get(st.getUniqueId());
 
-            // StartTx 이전 10분 내 메시지
+            // StartTx 이전 10분 내 전체 메시지 (CS→CP 포함, RemoteStartTransaction 감지 위해 allMessages 사용)
             LocalDateTime windowStart = stTs.minusMinutes(10);
-            List<OcppMessage> pre = calls.stream()
+            List<OcppMessage> preAll = allMessages.stream()
                     .filter(m -> m.getTimestamp() != null
                             && !m.getTimestamp().isBefore(windowStart)
                             && m.getTimestamp().isBefore(stTs))
                     .collect(Collectors.toList());
 
-            // StatusNotification(Preparing) 체크
-            boolean hasPreparing = pre.stream().anyMatch(m ->
-                    "StatusNotification".equals(m.getAction())
-                    && m.getPayloadDetail() != null
-                    && "Preparing".equals(m.getPayloadDetail().get("status")));
-            if (!hasPreparing) {
-                addViolation(violations, "WARN", stTs,
-                        sessionLabel + ": StartTransaction 전 StatusNotification(Preparing) 없음",
-                        chargerId, txId, null);
+            // 세션 시작 신호 확인: Preparing / Authorize / RemoteStartTransaction 중 하나라도 있으면 완전한 세션
+            boolean hasSessionStart = preAll.stream().anyMatch(this::isSessionStartSignal);
+            if (!hasSessionStart) {
+                // 로그 파일 범위 밖에서 시작된 세션 → 흐름 검증 생략 (오탐 방지)
+                continue;
             }
 
             // 대응 StopTx 탐색
@@ -396,32 +403,45 @@ public class AnalysisService {
                         sessionLabel + ": StartTransaction 후 StatusNotification(Charging) 없음",
                         chargerId, txId, null);
             }
-
-            // StopTx 이후 5분 내 Finishing / Available 체크
-            List<OcppMessage> post = calls.stream()
-                    .filter(m -> m.getTimestamp() != null
-                            && !m.getTimestamp().isBefore(stpTs)
-                            && m.getTimestamp().isBefore(stpTs.plusMinutes(5)))
-                    .collect(Collectors.toList());
-
-            boolean hasFinishing = post.stream().anyMatch(m ->
-                    "StatusNotification".equals(m.getAction())
-                    && m.getPayloadDetail() != null
-                    && "Finishing".equals(m.getPayloadDetail().get("status")));
-            boolean hasAvailable = post.stream().anyMatch(m ->
-                    "StatusNotification".equals(m.getAction())
-                    && m.getPayloadDetail() != null
-                    && "Available".equals(m.getPayloadDetail().get("status")));
-
-            if (!hasFinishing)
-                addViolation(violations, "WARN", stpTs,
-                        sessionLabel + ": StopTransaction 후 StatusNotification(Finishing) 없음",
-                        chargerId, txId, null);
-            if (!hasAvailable)
-                addViolation(violations, "WARN", stpTs,
-                        sessionLabel + ": StopTransaction 후 StatusNotification(Available) 없음",
-                        chargerId, txId, null);
         }
+    }
+
+    /**
+     * 세션 시작 신호 판별
+     * - StatusNotification(Preparing): 커넥터가 준비 상태로 전환
+     * - Authorize: 사용자 인증 (RFID 등)
+     * - RemoteStartTransaction: CS에서 원격 충전 시작 명령 (CS→CP)
+     */
+    private boolean isSessionStartSignal(OcppMessage m) {
+        if ("StatusNotification".equals(m.getAction())
+                && m.getPayloadDetail() != null
+                && "Preparing".equals(m.getPayloadDetail().get("status"))) {
+            return true;
+        }
+        return "Authorize".equals(m.getAction())
+                || "RemoteStartTransaction".equals(m.getAction());
+    }
+
+    /**
+     * 시작 신호(Preparing/Authorize/RemoteStartTransaction)가 확인된 완전한 세션 건수 반환
+     */
+    private int countCompleteSessionStarts(List<OcppMessage> messages) {
+        List<OcppMessage> startTxList = messages.stream()
+                .filter(OcppMessage::isCall)
+                .filter(m -> "StartTransaction".equals(m.getAction()) && m.getTimestamp() != null)
+                .collect(Collectors.toList());
+
+        int count = 0;
+        for (OcppMessage st : startTxList) {
+            LocalDateTime windowStart = st.getTimestamp().minusMinutes(10);
+            boolean hasSignal = messages.stream()
+                    .filter(m -> m.getTimestamp() != null
+                            && !m.getTimestamp().isBefore(windowStart)
+                            && m.getTimestamp().isBefore(st.getTimestamp()))
+                    .anyMatch(this::isSessionStartSignal);
+            if (hasSignal) count++;
+        }
+        return count;
     }
 
     private void addViolation(List<FlowViolation> violations, String severity,

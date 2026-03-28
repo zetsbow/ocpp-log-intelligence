@@ -33,6 +33,9 @@ public class OcppFlowEntry {
     /** 응답 상태 (CallResult): Accepted, Rejected, currentTime=... 등 */
     private String status;
 
+    /** 위반이 발생한 트랜잭션의 전문 여부: Y / N */
+    private String isFault;
+
     /**
      * DB 저장용 상세 정보 문자열
      * - StatusNotification : "status=Charging, errorCode=NoError"

@@ -7,6 +7,7 @@
         <id     property="id"            column="id"/>
         <result property="sessionId"     column="session_id"/>
         <result property="messageId"     column="message_id"/>
+        <result property="isFault"       column="is_fault"/>
         <result property="transactionId" column="transaction_id"/>
         <result property="chargerId"     column="charger_id"/>
         <result property="timestamp"     column="log_timestamp"/>
@@ -19,10 +20,10 @@
 
     <insert id="insertAll">
         INSERT INTO transaction_detail
-            (session_id, message_id, transaction_id, charger_id, log_timestamp, action, message_type, direction, status, detail_text)
+            (session_id, message_id, is_fault, transaction_id, charger_id, log_timestamp, action, message_type, direction, status, detail_text)
         VALUES
         <foreach collection="list" item="e" separator=",">
-            (#{e.sessionId}, #{e.messageId}, #{e.transactionId}, #{e.chargerId}, #{e.timestamp}, #{e.action},
+            (#{e.sessionId}, #{e.messageId}, #{e.isFault}, #{e.transactionId}, #{e.chargerId}, #{e.timestamp}, #{e.action},
              #{e.messageType}, #{e.direction}, #{e.status}, #{e.detailText})
         </foreach>
     </insert>
