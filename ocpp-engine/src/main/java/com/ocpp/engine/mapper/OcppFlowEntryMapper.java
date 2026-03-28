@@ -9,5 +9,5 @@ import java.util.List;
 @Mapper
 public interface OcppFlowEntryMapper {
     void insertAll(@Param("list") List<OcppFlowEntry> entries);
-    List<OcppFlowEntry> findByAnalysisId(@Param("analysisId") Long analysisId);
+    List<OcppFlowEntry> findByAnalysisId(@Param("analysisId") String analysisId);
 }

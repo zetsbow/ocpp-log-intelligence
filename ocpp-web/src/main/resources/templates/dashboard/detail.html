@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{fragments/layout}">
+<head>
+  <title>트랜잭션 상세 - OCPP Analyzer</title>
+  <style>
+    /* ── 페이지 헤더 ─────────────────────────────────── */
+    .page-header h4 { font-size: 1.3rem; font-weight: 800; color: #1a237e; margin: 0; }
+    .page-header .sub { font-size: .83rem; color: #90a4ae; margin-top: .2rem; }
+
+    /* ── 카드 공통 ───────────────────────────────────── */
+    .detail-card {
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+    .detail-card .card-header {
+      background: #f8fafc;
+      border-bottom: 1px solid rgba(0,0,0,.07);
+      padding: .85rem 1.3rem;
+      font-size: .92rem;
+      font-weight: 700;
+      color: #1a237e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* ── 요약 카드 ───────────────────────────────────── */
+    .summary-label { font-size: .75rem; color: #90a4ae; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+    .summary-value { font-size: .95rem; font-weight: 600; color: #37474f; margin-top: .15rem; }
+    .summary-value code { font-size: .88rem; color: #5c6bc0; }
+
+    /* ── KPI 미니 배지 ───────────────────────────────── */
+    .kpi-mini {
+      background: #e8eaf6;
+      color: #3949ab;
+      border-radius: 10px;
+      padding: .35rem .8rem;
+      font-size: .82rem;
+      font-weight: 700;
+      display: inline-block;
+    }
+    .kpi-mini.red { background: #ffebee; color: #c62828; }
+    .kpi-mini.green { background: #e8f5e9; color: #2e7d32; }
+
+    /* ── 테이블 ─────────────────────────────────────── */
+    .detail-table th {
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #78909c;
+      font-weight: 600;
+      background: #f8fafc;
+      border-bottom: 2px solid #e8eaf6;
+      padding: .65rem .9rem;
+      white-space: nowrap;
+    }
+    .detail-table td {
+      font-size: .82rem;
+      padding: .65rem .9rem;
+      vertical-align: middle;
+      border-bottom: 1px solid #f0f4f8;
+      color: #37474f;
+    }
+    .detail-table tr:last-child td { border-bottom: none; }
+    .detail-table tr:hover td { background: #f5f7ff; }
+
+    /* ── 메시지 유형 뱃지 ────────────────────────────── */
+    .badge-call       { background: #e3f2fd; color: #1565c0; font-weight: 700; }
+    .badge-callresult { background: #e8f5e9; color: #2e7d32; font-weight: 700; }
+    .badge-callerror  { background: #ffebee; color: #c62828; font-weight: 700; }
+    .badge-msg { border-radius: 20px; padding: 2px 9px; font-size: .72rem; }
+
+    /* ── 방향 ───────────────────────────────────────── */
+    .dir-cp { color: #e65100; font-weight: 700; font-size: .8rem; }
+    .dir-cs { color: #1565c0; font-weight: 700; font-size: .8rem; }
+
+    /* ── 세션 뱃지 ──────────────────────────────────── */
+    .session-badge {
+      display: inline-block;
+      background: #e8eaf6;
+      color: #3949ab;
+      font-family: 'Courier New', monospace;
+      font-size: .78rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    /* ── 빈 상태 ─────────────────────────────────────── */
+    .empty-state { padding: 3rem 0; text-align: center; color: #b0bec5; }
+    .empty-state i { font-size: 2.2rem; margin-bottom: .6rem; display: block; }
+
+    /* ── 상세 팝오버 텍스트 ──────────────────────────── */
+    .text-ellipsis { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .detail-text { font-size: .75rem; color: #78909c; }
+
+    /* ── 뒤로가기 버튼 ───────────────────────────────── */
+    .btn-back {
+      background: #f1f3f4;
+      border: none;
+      border-radius: 8px;
+      padding: .42rem 1rem;
+      font-size: .82rem;
+      font-weight: 600;
+      color: #37474f;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      text-decoration: none;
+      transition: background .2s;
+    }
+    .btn-back:hover { background: #e8eaf6; color: #1a237e; }
+  </style>
+</head>
+
+<th:block layout:fragment="content">
+
+  <!-- 페이지 헤더 -->
+  <div class="page-header d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h4><i class="bi bi-list-columns-reverse me-2"></i>트랜잭션 상세</h4>
+      <div class="sub">
+        세션 <span class="session-badge" th:text="${sessionId}">-</span> 의 OCPP 전문 흐름
+      </div>
+    </div>
+    <a th:href="@{/dashboard}" class="btn-back">
+      <i class="bi bi-arrow-left"></i> 대시보드로
+    </a>
+  </div>
+
+  <!-- 엔진 오류 -->
+  <div th:if="${engineError}"
+       style="border:none;border-radius:12px;background:#fff3e0;color:#e65100;padding:.9rem 1.2rem;font-size:.88rem;display:flex;align-items:center;gap:.6rem;margin-bottom:1.5rem;">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    ocpp-engine(7778) 에 연결할 수 없습니다. 엔진 서버를 먼저 기동해주세요.
+  </div>
+
+  <!-- ── 분석 결과 요약 카드 ─────────────────────────────── -->
+  <div class="detail-card card" th:if="${result != null}">
+    <div class="card-header">
+      <span><i class="bi bi-info-circle me-2"></i>분석 결과 요약</span>
+      <span class="badge" style="background:#ede7f6;color:#4527a0;font-size:.75rem;padding:3px 10px;border-radius:20px"
+            th:text="${result.analysisType}">-</span>
+    </div>
+    <div class="card-body" style="padding:1.2rem 1.4rem">
+      <div class="row g-3">
+        <div class="col-6 col-md-3">
+          <div class="summary-label">충전기 ID</div>
+          <div class="summary-value"><code th:text="${result.chargerId} ?: '전체'">-</code></div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="summary-label">분석 일시</div>
+          <div class="summary-value" th:text="${#temporals.format(result.analyzedAt,'yyyy-MM-dd HH:mm')}">-</div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="summary-label">전체 트랜잭션</div>
+          <div class="summary-value">
+            <span class="kpi-mini" th:text="${result.totalTransaction}">0</span>
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="summary-label">장애 트랜잭션</div>
+          <div class="summary-value">
+            <span th:classappend="${result.faultTransactionCount > 0} ? 'red' : 'green'"
+                  class="kpi-mini"
+                  th:text="${result.faultTransactionCount}">0</span>
+          </div>
+        </div>
+        <div class="col-12 col-md-2">
+          <div class="summary-label">파일명</div>
+          <div class="summary-value" style="font-size:.82rem;word-break:break-all"
+               th:text="${result.fileName} ?: '-'">-</div>
+        </div>
+        <div class="col-12" th:if="${result.summary != null and !result.summary.isEmpty()}">
+          <div class="summary-label">요약</div>
+          <div style="font-size:.83rem;color:#546e7a;margin-top:.2rem;line-height:1.5"
+               th:text="${result.summary}">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 트랜잭션 상세 테이블 ─────────────────────────────── -->
+  <div class="detail-card card">
+    <div class="card-header">
+      <span><i class="bi bi-table me-2"></i>트랜잭션 상세 <small style="font-size:.72rem;color:#90a4ae;font-weight:400">(transaction_detail)</small></span>
+      <span class="kpi-mini"
+            th:text="${details != null} ? ${details.size()} + '건' : '0건'">0건</span>
+    </div>
+
+    <!-- 빈 상태 -->
+    <div th:if="${details == null or details.isEmpty()}" class="empty-state">
+      <i class="bi bi-inbox"></i>
+      <p style="font-size:.88rem">이 세션에 해당하는 트랜잭션 상세 데이터가 없습니다.</p>
+    </div>
+
+    <!-- 테이블 -->
+    <div class="table-responsive" th:if="${details != null and !details.isEmpty()}">
+      <table class="table mb-0 detail-table">
+        <thead>
+          <tr>
+            <th style="width:50px">#</th>
+            <th>트랜잭션 ID</th>
+            <th>충전기</th>
+            <th>타임스탬프</th>
+            <th>액션(Action)</th>
+            <th>메시지 유형</th>
+            <th>방향</th>
+            <th>상태</th>
+            <th>상세 정보</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="d,i : ${details}">
+            <!-- No -->
+            <td style="color:#b0bec5;font-size:.75rem" th:text="${i.count}">1</td>
+
+            <!-- 트랜잭션 ID -->
+            <td>
+              <code style="font-size:.78rem;color:#5c6bc0" th:text="${d.transactionId} ?: '-'">-</code>
+            </td>
+
+            <!-- 충전기 ID -->
+            <td style="font-size:.8rem" th:text="${d.chargerId} ?: '-'">-</td>
+
+            <!-- 타임스탬프 -->
+            <td style="white-space:nowrap;font-size:.78rem;color:#78909c"
+                th:text="${d.timestamp} ?: '-'">-</td>
+
+            <!-- 액션 -->
+            <td><strong style="font-size:.83rem" th:text="${d.action} ?: '-'">-</strong></td>
+
+            <!-- 메시지 유형 -->
+            <td>
+              <span class="badge-msg"
+                    th:classappend="${d.messageType == 'Call'} ? 'badge-call'
+                                  : (${d.messageType == 'CallResult'} ? 'badge-callresult'
+                                  : 'badge-callerror')"
+                    th:text="${d.messageType} ?: '-'">-</span>
+            </td>
+
+            <!-- 방향 -->
+            <td>
+              <span th:if="${d.direction != null and d.direction.contains('CP')}" class="dir-cp"
+                    th:text="${d.direction}">CP→CS</span>
+              <span th:if="${d.direction == null or !d.direction.contains('CP')}" class="dir-cs"
+                    th:text="${d.direction} ?: '-'">CS→CP</span>
+            </td>
+
+            <!-- 상태 -->
+            <td class="text-ellipsis" style="max-width:130px"
+                th:text="${d.status} ?: '-'">-</td>
+
+            <!-- 상세 텍스트 -->
+            <td class="detail-text text-ellipsis"
+                th:title="${d.detailText}"
+                th:text="${d.detailText} ?: '-'">-</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</th:block>
+</html>

@@ -3,11 +3,13 @@ package com.ocpp.web.client;
 import com.ocpp.web.dto.AnalysisResultDto;
 import com.ocpp.web.dto.AnalyzeRequestDto;
 import com.ocpp.web.dto.FaultPatternDto;
+import com.ocpp.web.dto.OcppFlowEntryDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -37,11 +39,12 @@ public class EngineClient {
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log.info("[EngineClient] POST {}", url);
         log.info("[EngineClient] 요청 파라미터");
-        log.info("  ├─ chargerId  : {}", isBlank(request.getChargerId()) ? "(전체 분석)" : request.getChargerId());
-        log.info("  ├─ fromTime   : {}", request.getFromTime() != null   ? request.getFromTime()  : "(제한 없음)");
-        log.info("  ├─ toTime     : {}", request.getToTime()   != null   ? request.getToTime()    : "(제한 없음)");
-        log.info("  ├─ fileName   : {}", isBlank(request.getFileName())  ? "(없음)" : request.getFileName());
-        log.info("  ├─ fileUrl    : {}", isBlank(request.getFileUrl())   ? "(없음)" : request.getFileUrl());
+        log.info("  ├─ sessionId  : {}", isBlank(request.getSessionId())  ? "(없음)"    : request.getSessionId());
+        log.info("  ├─ chargerId  : {}", isBlank(request.getChargerId())  ? "(전체 분석)" : request.getChargerId());
+        log.info("  ├─ fromTime   : {}", request.getFromTime()  != null   ? request.getFromTime()  : "(제한 없음)");
+        log.info("  ├─ toTime     : {}", request.getToTime()    != null   ? request.getToTime()    : "(제한 없음)");
+        log.info("  ├─ fileName   : {}", isBlank(request.getFileName())   ? "(없음)" : request.getFileName());
+        log.info("  ├─ fileUrl    : {}", isBlank(request.getFileUrl())    ? "(없음)" : request.getFileUrl());
         log.info("  └─ logContent : {}", request.getLogContent() != null
                 ? request.getLogContent().length() + " bytes" : "(없음)");
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -64,8 +67,9 @@ public class EngineClient {
 
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log.info("[EngineClient] POST {} (배치)", url);
-        log.info("  ├─ fileName : {}", isBlank(request.getFileName()) ? "(없음)" : request.getFileName());
-        log.info("  └─ fileUrl  : {}", isBlank(request.getFileUrl())  ? "(없음)" : request.getFileUrl());
+        log.info("  ├─ sessionId : {}", isBlank(request.getSessionId()) ? "(없음)" : request.getSessionId());
+        log.info("  ├─ fileName  : {}", isBlank(request.getFileName())  ? "(없음)" : request.getFileName());
+        log.info("  └─ fileUrl   : {}", isBlank(request.getFileUrl())   ? "(없음)" : request.getFileUrl());
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         try {
@@ -81,10 +85,39 @@ public class EngineClient {
         }
     }
 
+    /** 분석 이력 목록 조회 */
     public List<AnalysisResultDto> getHistory(int limit) {
         String url = engineUrl + "/api/analyze/history?limit=" + limit;
         log.debug("[EngineClient] GET {}", url);
         ResponseEntity<List<AnalysisResultDto>> res = restTemplate.exchange(
+                url, HttpMethod.GET, jsonEntity(null),
+                new ParameterizedTypeReference<>() {});
+        return res.getBody();
+    }
+
+    /**
+     * sessionId로 분석 결과 단건 조회 (PRG 패턴용 — GET 결과 페이지에서 사용)
+     * GET /api/analyze/history/{sessionId}
+     */
+    public AnalysisResultDto getResultBySessionId(String sessionId) {
+        String url = engineUrl + "/api/analyze/history/" + sessionId;
+        log.info("[EngineClient] GET {} (결과 조회)", url);
+        try {
+            return restTemplate.getForObject(url, AnalysisResultDto.class);
+        } catch (HttpClientErrorException.NotFound e) {
+            log.warn("[EngineClient] 결과 없음 - sessionId={}", sessionId);
+            return null;
+        } catch (RestClientException e) {
+            log.error("[EngineClient] 결과 조회 실패 - sessionId={}, error={}", sessionId, e.getMessage());
+            throw e;
+        }
+    }
+
+    /** sessionId로 트랜잭션 상세 목록 조회 */
+    public List<OcppFlowEntryDto> getTransactionDetail(String sessionId) {
+        String url = engineUrl + "/api/transaction-detail/" + sessionId;
+        log.debug("[EngineClient] GET {}", url);
+        ResponseEntity<List<OcppFlowEntryDto>> res = restTemplate.exchange(
                 url, HttpMethod.GET, jsonEntity(null),
                 new ParameterizedTypeReference<>() {});
         return res.getBody();

@@ -12,17 +12,15 @@
         <result property="analysisType"          column="analysis_type"/>
         <result property="fileName"              column="file_name"/>
         <result property="summary"               column="summary"/>
-        <result property="transactionCount"      column="transaction_count"/>
-        <result property="errorTransactionCount" column="error_transaction_count"/>
     </resultMap>
 
     <insert id="insert">
         INSERT INTO analysis_result
             (session_id, charger_id, analyzed_at, total_transaction, fault_transaction_count,
-             analysis_type, file_name, summary, transaction_count, error_transaction_count)
+             analysis_type, file_name, summary)
         VALUES
             (#{sessionId}, #{chargerId}, NOW(), #{totalTransaction}, #{faultTransactionCount},
-             #{analysisType}, #{fileName}, #{summary}, #{transactionCount}, #{errorTransactionCount})
+             #{analysisType}, #{fileName}, #{summary})
     </insert>
 
     <select id="findRecent" resultMap="resultRM">
