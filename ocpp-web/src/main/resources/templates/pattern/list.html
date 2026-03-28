@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{fragments/layout}">
+
+<th:block layout:fragment="content">
+
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h4 class="fw-bold mb-0"><i class="bi bi-shield-exclamation text-warning me-2"></i>장애 패턴 관리</h4>
+    <a th:href="@{/pattern/new}" class="btn btn-success">
+      <i class="bi bi-plus-circle me-1"></i> 패턴 등록
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <div th:if="${patterns == null or patterns.isEmpty()}" class="text-center text-muted py-5">
+        등록된 패턴이 없습니다.
+      </div>
+      <table class="table table-hover mb-0" th:if="${patterns != null and !patterns.isEmpty()}">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>패턴명</th>
+            <th>트리거 액션</th>
+            <th>트리거 상태</th>
+            <th>이후 감지 액션</th>
+            <th>윈도우(초)</th>
+            <th>심각도</th>
+            <th>활성</th>
+            <th>관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="p : ${patterns}">
+            <td class="text-muted small" th:text="${p.id}">-</td>
+            <td class="fw-semibold" th:text="${p.name}">-</td>
+            <td><span class="badge bg-primary" th:text="${p.triggerAction}">-</span></td>
+            <td>
+              <span class="badge"
+                    th:classappend="${p.triggerStatus == 'Invalid' ? 'bg-danger' : (p.triggerStatus == 'Accepted' ? 'bg-success' : 'bg-secondary')}"
+                    th:text="${p.triggerStatus} ?: '—'">-</span>
+            </td>
+            <td><span class="badge bg-warning text-dark" th:text="${p.followAction}">-</span></td>
+            <td th:text="${p.withinSeconds}">60</td>
+            <td>
+              <span class="badge"
+                    th:classappend="${p.severity == 'HIGH' ? 'bg-danger' : (p.severity == 'MEDIUM' ? 'bg-warning text-dark' : 'bg-success')}"
+                    th:text="${p.severity}">-</span>
+            </td>
+            <td>
+              <span th:if="${p.enabled == 1}" class="badge bg-success">ON</span>
+              <span th:if="${p.enabled == 0}" class="badge bg-secondary">OFF</span>
+            </td>
+            <td>
+              <a th:href="@{/pattern/{id}/edit(id=${p.id})}" class="btn btn-sm btn-outline-primary me-1">수정</a>
+              <form th:action="@{/pattern/{id}/delete(id=${p.id})}" method="post" class="d-inline"
+                    onsubmit="return confirm('삭제하시겠습니까?')">
+                <button type="submit" class="btn btn-sm btn-outline-danger">삭제</button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</th:block>
+</html>

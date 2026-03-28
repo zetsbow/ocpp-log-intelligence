@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ocpp.engine.mapper.AnalysisResultMapper">
+
+    <resultMap id="resultRM" type="AnalysisResult">
+        <id     property="id"            column="id"/>
+        <result property="chargerId"     column="charger_id"/>
+        <result property="analyzedAt"    column="analyzed_at"/>
+        <result property="totalMsgCount" column="total_msg_count"/>
+        <result property="faultCount"    column="fault_count"/>
+        <result property="analysisType"  column="analysis_type"/>
+        <result property="fileName"      column="file_name"/>
+        <result property="summary"       column="summary"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO analysis_result
+            (charger_id, analyzed_at, total_msg_count, fault_count,
+             analysis_type, file_name, summary)
+        VALUES
+            (#{chargerId}, NOW(), #{totalMsgCount}, #{faultCount},
+             #{analysisType}, #{fileName}, #{summary})
+    </insert>
+
+    <select id="findRecent" resultMap="resultRM">
+        SELECT * FROM analysis_result
+        ORDER BY analyzed_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findAll" resultMap="resultRM">
+        SELECT * FROM analysis_result ORDER BY analyzed_at DESC
+    </select>
+
+    <select id="findById" resultMap="resultRM">
+        SELECT * FROM analysis_result WHERE id = #{id}
+    </select>
+
+</mapper>

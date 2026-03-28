@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{fragments/layout}">
+
+<th:block layout:fragment="content">
+
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <h4 class="fw-bold mb-0">
+      <i class="bi bi-shield-plus text-warning me-2"></i>
+      <span th:text="${mode == 'new' ? '패턴 등록' : '패턴 수정'}">패턴 등록</span>
+    </h4>
+    <a th:href="@{/pattern}" class="btn btn-sm btn-outline-secondary">← 목록</a>
+  </div>
+
+  <div class="card" style="max-width: 700px">
+    <div class="card-body">
+      <form th:action="@{/pattern/save}" method="post">
+        <input type="hidden" name="id" th:value="${pattern.id}"/>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">패턴명 <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" required
+                 th:value="${pattern.name}"
+                 placeholder="예: StartTransaction Invalid 후 MeterValues 전송"/>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col">
+            <label class="form-label fw-semibold">트리거 액션 <span class="text-danger">*</span></label>
+            <select name="triggerAction" class="form-select" required>
+              <option value="">선택</option>
+              <option th:each="a : ${ {'BootNotification','Authorize','StartTransaction','StopTransaction','MeterValues','Heartbeat','StatusNotification'} }"
+                      th:value="${a}" th:text="${a}"
+                      th:selected="${a == pattern.triggerAction}"></option>
+            </select>
+          </div>
+          <div class="col">
+            <label class="form-label fw-semibold">트리거 응답 상태</label>
+            <select name="triggerStatus" class="form-select">
+              <option value="">전체 (무관)</option>
+              <option th:each="s : ${ {'Accepted','Invalid','Rejected','Blocked','Expired','ConcurrentTx','Faulted'} }"
+                      th:value="${s}" th:text="${s}"
+                      th:selected="${s == pattern.triggerStatus}"></option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col">
+            <label class="form-label fw-semibold">이후 감지 액션 <span class="text-danger">*</span></label>
+            <select name="followAction" class="form-select" required>
+              <option value="">선택</option>
+              <option th:each="a : ${ {'BootNotification','Authorize','StartTransaction','StopTransaction','MeterValues','Heartbeat','StatusNotification'} }"
+                      th:value="${a}" th:text="${a}"
+                      th:selected="${a == pattern.followAction}"></option>
+            </select>
+          </div>
+          <div class="col">
+            <label class="form-label fw-semibold">시간 윈도우 (초) <span class="text-danger">*</span></label>
+            <input type="number" name="withinSeconds" class="form-control" min="1" max="3600"
+                   th:value="${pattern.withinSeconds != 0 ? pattern.withinSeconds : 60}" required/>
+            <div class="form-text">트리거 이후 이 시간 내에 감지 액션이 있으면 장애로 탐지</div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">심각도</label>
+          <select name="severity" class="form-select">
+            <option value="HIGH"   th:selected="${pattern.severity == 'HIGH'}">HIGH — 즉시 조치 필요</option>
+            <option value="MEDIUM" th:selected="${pattern.severity == 'MEDIUM' or pattern.severity == null}">MEDIUM — 주의</option>
+            <option value="LOW"    th:selected="${pattern.severity == 'LOW'}">LOW — 모니터링</option>
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">설명</label>
+          <textarea name="description" class="form-control" rows="3"
+                    placeholder="패턴에 대한 상세 설명을 입력하세요"
+                    th:text="${pattern.description}"></textarea>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-save me-1"></i>
+            <span th:text="${mode == 'new' ? '등록' : '저장'}">저장</span>
+          </button>
+          <a th:href="@{/pattern}" class="btn btn-outline-secondary">취소</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</th:block>
+</html>

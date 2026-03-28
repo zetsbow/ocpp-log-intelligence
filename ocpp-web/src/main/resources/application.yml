@@ -1,0 +1,39 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ocpp-web
+  datasource:
+    url: jdbc:mysql://59.15.133.144:16000/CSMS?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+    username: csmsoper
+    password: csmsoper121
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: ocpp-web-pool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  thymeleaf:
+    cache: false
+    encoding: UTF-8
+    prefix: classpath:/templates/
+    suffix: .html
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.ocpp.web.dto
+  configuration:
+    map-underscore-to-camel-case: true
+    default-fetch-size: 100
+    default-statement-timeout: 30
+
+engine:
+  url: http://localhost:8081
+
+logging:
+  level:
+    com.ocpp: DEBUG
+    org.mybatis: DEBUG

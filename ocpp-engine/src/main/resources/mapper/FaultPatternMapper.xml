@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ocpp.engine.mapper.FaultPatternMapper">
+
+    <resultMap id="patternRM" type="FaultPattern">
+        <id     property="id"            column="id"/>
+        <result property="name"          column="name"/>
+        <result property="triggerAction" column="trigger_action"/>
+        <result property="triggerStatus" column="trigger_status"/>
+        <result property="followAction"  column="follow_action"/>
+        <result property="withinSeconds" column="within_seconds"/>
+        <result property="severity"      column="severity"/>
+        <result property="description"   column="description"/>
+        <result property="enabled"       column="enabled"/>
+        <result property="createdAt"     column="created_at"/>
+        <result property="updatedAt"     column="updated_at"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="patternRM">
+        SELECT * FROM fault_pattern ORDER BY created_at DESC
+    </select>
+
+    <select id="findAllEnabled" resultMap="patternRM">
+        SELECT * FROM fault_pattern WHERE enabled = 1 ORDER BY id
+    </select>
+
+    <select id="findById" resultMap="patternRM">
+        SELECT * FROM fault_pattern WHERE id = #{id}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO fault_pattern
+            (name, trigger_action, trigger_status, follow_action,
+             within_seconds, severity, description, enabled)
+        VALUES
+            (#{name}, #{triggerAction}, #{triggerStatus}, #{followAction},
+             #{withinSeconds}, #{severity}, #{description}, 1)
+    </insert>
+
+    <update id="update">
+        UPDATE fault_pattern SET
+            name           = #{name},
+            trigger_action = #{triggerAction},
+            trigger_status = #{triggerStatus},
+            follow_action  = #{followAction},
+            within_seconds = #{withinSeconds},
+            severity       = #{severity},
+            description    = #{description}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM fault_pattern WHERE id = #{id}
+    </delete>
+
+    <update id="updateEnabled">
+        UPDATE fault_pattern SET enabled = #{enabled} WHERE id = #{id}
+    </update>
+
+</mapper>
