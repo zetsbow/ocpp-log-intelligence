@@ -20,8 +20,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AnalyzeController {
 
-    private final AnalysisService       analysisService;
-    private final AnalysisResultMapper  analysisResultMapper;
+    private final AnalysisService      analysisService;
+    private final AnalysisResultMapper analysisResultMapper;
 
     /**
      * 기능2: 특정 충전기 · 시간 구간 로그 분석
@@ -30,17 +30,15 @@ public class AnalyzeController {
     @PostMapping("/charger")
     public ResponseEntity<AnalysisResult> analyzeCharger(@RequestBody AnalyzeRequest request) {
 
-        // ── 수신 파라미터 상세 로그 ──────────────────────────
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log.info("[AnalyzeController] POST /api/analyze/charger 수신");
-        log.info("  ├─ chargerId  : {}", request.getChargerId()  != null ? request.getChargerId()  : "(전체 분석)");
-        log.info("  ├─ fromTime   : {}", request.getFromTime()   != null ? request.getFromTime()   : "(제한 없음)");
-        log.info("  ├─ toTime     : {}", request.getToTime()     != null ? request.getToTime()     : "(제한 없음)");
-        log.info("  ├─ fileName   : {}", request.getFileName()   != null ? request.getFileName()   : "(없음)");
-        log.info("  ├─ filePath   : {}", request.getFilePath()   != null ? request.getFilePath()   : "(없음)");
+        log.info("  ├─ chargerId  : {}", isBlank(request.getChargerId())  ? "(전체 분석)" : request.getChargerId());
+        log.info("  ├─ fromTime   : {}", request.getFromTime()  != null   ? request.getFromTime()  : "(제한 없음)");
+        log.info("  ├─ toTime     : {}", request.getToTime()    != null   ? request.getToTime()    : "(제한 없음)");
+        log.info("  ├─ fileName   : {}", isBlank(request.getFileName())   ? "(없음)" : request.getFileName());
+        log.info("  ├─ fileUrl    : {}", isBlank(request.getFileUrl())    ? "(없음)" : request.getFileUrl());
         log.info("  └─ logContent : {}", request.getLogContent() != null
-                ? request.getLogContent().length() + " bytes"
-                : "(없음)");
+                ? request.getLogContent().length() + " bytes" : "(없음)");
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         AnalysisResult result = analysisService.analyze(request);
@@ -60,8 +58,8 @@ public class AnalyzeController {
 
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log.info("[AnalyzeController] POST /api/analyze/batch 수신");
-        log.info("  ├─ fileName   : {}", request.getFileName()   != null ? request.getFileName()   : "(없음)");
-        log.info("  └─ filePath   : {}", request.getFilePath()   != null ? request.getFilePath()   : "(없음)");
+        log.info("  ├─ fileName   : {}", isBlank(request.getFileName())  ? "(없음)" : request.getFileName());
+        log.info("  └─ fileUrl    : {}", isBlank(request.getFileUrl())   ? "(없음)" : request.getFileUrl());
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         request.setChargerId(null); // 배치는 전체 분석
@@ -92,5 +90,9 @@ public class AnalyzeController {
         AnalysisResult result = analysisResultMapper.findById(id);
         if (result == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(result);
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 }
