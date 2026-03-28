@@ -40,8 +40,10 @@ engine:
 
 ocpp:
   log:
-    # web과 engine이 동일 서버에 있으므로 같은 경로 공유
-    upload-dir: C:/ocpp-logs/upload
+    # 실행 위치(jar 위치) 기준 상대경로 → 어느 서버에 배포해도 자동 생성
+    # 개발 PC: ocpp-web 모듈 루트/logs/upload
+    # 운영 서버: jar 실행 위치/logs/upload
+    upload-dir: ./logs/upload
 
 logging:
   level:

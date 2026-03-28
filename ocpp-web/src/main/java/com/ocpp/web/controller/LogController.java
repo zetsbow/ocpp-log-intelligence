@@ -18,16 +18,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 /**
  * 로그 분석 컨트롤러
  *
- * [동작 방식 - 동일 서버]
- * 1. 사용자가 파일 업로드
- * 2. web 서버가 공유 경로(C:/ocpp-logs/upload)에 파일 저장
- * 3. engine에 저장된 파일의 절대 경로만 전달
- * 4. engine이 동일 경로에서 직접 파일 읽어 분석
+ * 파일 저장 규칙:
+ *   - 원본 파일명 그대로 저장 → URL 예측 가능
+ *   - 예) OCPP16_Log-2026-03-26.0.txt
+ *   - http://localhost:7777/log/upload/OCPP16_Log-2026-03-26.0.txt 로 바로 접근 가능
+ *   - 동일 파일명이 이미 존재하면 덮어씀 (재업로드 가능)
  */
 @Slf4j
 @Controller
@@ -64,9 +63,12 @@ public class LogController {
         }
 
         try {
-            // 1. 공유 경로에 파일 저장
+            // 1. 원본 파일명 그대로 저장
             Path savedPath = saveUploadedFile(logFile);
+
             log.info("[LogController] 파일 저장 완료: {}", savedPath);
+            log.info("[LogController] 파일 URL: http://localhost:7777/log/upload/{}",
+                    savedPath.getFileName());
 
             // 2. engine에 파일 경로 + 필터 조건 전달
             AnalyzeRequestDto req = new AnalyzeRequestDto();
@@ -78,8 +80,10 @@ public class LogController {
 
             // 3. 분석 결과 수신
             AnalysisResultDto result = engineClient.analyzeCharger(req);
-            model.addAttribute("result", result);
+            model.addAttribute("result",    result);
             model.addAttribute("savedPath", savedPath.toAbsolutePath().toString());
+            model.addAttribute("fileUrl",
+                    "/log/upload/" + savedPath.getFileName().toString());
 
         } catch (IOException e) {
             log.error("[LogController] 파일 저장 실패", e);
@@ -92,17 +96,17 @@ public class LogController {
     }
 
     /**
-     * 업로드 파일을 공유 경로에 저장
-     * 파일명 중복 방지를 위해 타임스탬프 prefix 추가
+     * 업로드 파일 저장
+     * - 원본 파일명 그대로 사용 → URL 예측 가능
+     * - REPLACE_EXISTING: 동일 파일 재업로드 시 덮어씀
      */
     private Path saveUploadedFile(MultipartFile file) throws IOException {
         Path uploadPath = Paths.get(uploadDir);
-        Files.createDirectories(uploadPath);  // 디렉토리 없으면 자동 생성
+        Files.createDirectories(uploadPath);
 
-        String timestamp = LocalDateTime.now()
-                .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        String savedName = timestamp + "_" + file.getOriginalFilename();
-        Path savedPath   = uploadPath.resolve(savedName);
+        // 원본 파일명 그대로 사용
+        String originalName = file.getOriginalFilename();
+        Path savedPath = uploadPath.resolve(originalName);
 
         Files.copy(file.getInputStream(), savedPath, StandardCopyOption.REPLACE_EXISTING);
         return savedPath;
