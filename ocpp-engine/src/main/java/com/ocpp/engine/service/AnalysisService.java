@@ -114,8 +114,8 @@ public class AnalysisService {
             e.setSessionId(sessionId);
             e.setIsFault(e.getTransactionId() != null && faultTxIds.contains(e.getTransactionId()) ? "Y" : "N");
         });
-        for (int i = 0; i < flowEntries.size(); i += 100) {
-            ocppFlowEntryMapper.insertAll(flowEntries.subList(i, Math.min(i + 100, flowEntries.size())));
+        for (int i = 0; i < flowEntries.size(); i += 1_000) {
+            ocppFlowEntryMapper.insertAll(flowEntries.subList(i, Math.min(i + 1_000, flowEntries.size())));
         }
 
         // 11. flow_violation INSERT
@@ -346,7 +346,29 @@ public class AnalysisService {
     private void checkHeartbeatInterval(List<OcppMessage> calls, List<FlowViolation> violations,
                                          String chargerId, List<OcppMessage> allMessages,
                                          Map<String, String> uidToDisplay) {
+        // BATCH 모드에서 충전기별로 분리 처리 (혼용 방지)
+        if (chargerId == null) {
+            calls.stream()
+                    .map(OcppMessage::getChargerId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .forEach(cid -> {
+                        List<OcppMessage> cidCalls = calls.stream()
+                                .filter(m -> cid.equals(m.getChargerId()))
+                                .collect(Collectors.toList());
+                        List<OcppMessage> cidAllMessages = allMessages.stream()
+                                .filter(m -> cid.equals(m.getChargerId()))
+                                .collect(Collectors.toList());
+                        doCheckHeartbeatInterval(cidCalls, violations, cid, cidAllMessages, uidToDisplay);
+                    });
+        } else {
+            doCheckHeartbeatInterval(calls, violations, chargerId, allMessages, uidToDisplay);
+        }
+    }
 
+    private void doCheckHeartbeatInterval(List<OcppMessage> calls, List<FlowViolation> violations,
+                                           String chargerId, List<OcppMessage> allMessages,
+                                           Map<String, String> uidToDisplay) {
         List<OcppMessage> heartbeats = calls.stream()
                 .filter(m -> "Heartbeat".equals(m.getAction()) && m.getTimestamp() != null)
                 .collect(Collectors.toList());
@@ -357,13 +379,12 @@ public class AnalysisService {
                     heartbeats.get(i).getTimestamp());
             if (gapMin > 11) {
                 LocalDateTime ts = heartbeats.get(i).getTimestamp();
-                String effectiveChargerId = chargerId != null ? chargerId : heartbeats.get(i).getChargerId();
                 addViolation(violations, "WARN", ts,
                         String.format("Heartbeat 간격 초과: %s → %s (%d분)",
                                 heartbeats.get(i - 1).getTimestamp().format(TS_FMT),
                                 ts.format(TS_FMT),
                                 gapMin),
-                        effectiveChargerId,
+                        chargerId,
                         findActiveTxId(allMessages, uidToDisplay, ts), null);
             }
         }
@@ -392,6 +413,29 @@ public class AnalysisService {
     private void checkChargingSessionFlow(List<OcppMessage> calls, List<FlowViolation> violations,
                                            String chargerId, Map<String, String> uidToTxId,
                                            List<OcppMessage> allMessages) {
+        // BATCH 모드에서 충전기별로 분리 처리 (혼용 방지)
+        if (chargerId == null) {
+            calls.stream()
+                    .map(OcppMessage::getChargerId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .forEach(cid -> {
+                        List<OcppMessage> cidCalls = calls.stream()
+                                .filter(m -> cid.equals(m.getChargerId()))
+                                .collect(Collectors.toList());
+                        List<OcppMessage> cidAllMessages = allMessages.stream()
+                                .filter(m -> cid.equals(m.getChargerId()))
+                                .collect(Collectors.toList());
+                        doCheckChargingSessionFlow(cidCalls, violations, cid, uidToTxId, cidAllMessages);
+                    });
+        } else {
+            doCheckChargingSessionFlow(calls, violations, chargerId, uidToTxId, allMessages);
+        }
+    }
+
+    private void doCheckChargingSessionFlow(List<OcppMessage> calls, List<FlowViolation> violations,
+                                             String chargerId, Map<String, String> uidToTxId,
+                                             List<OcppMessage> allMessages) {
         List<OcppMessage> startTxList = calls.stream()
                 .filter(m -> "StartTransaction".equals(m.getAction()))
                 .collect(Collectors.toList());
@@ -406,8 +450,7 @@ public class AnalysisService {
             LocalDateTime stTs     = st.getTimestamp();
             LocalDateTime nextStTs = (i + 1 < startTxList.size()) ? startTxList.get(i + 1).getTimestamp() : null;
             String sessionLabel    = String.format("세션%d(%s)", i + 1, stTs.format(TS_FMT));
-            String txId            = uidToTxId.get(st.getUniqueId());
-            String effectiveChargerId = chargerId != null ? chargerId : st.getChargerId();
+            String txId = uidToTxId.get(st.getUniqueId());
 
             // StartTx 이전 10분 내 전체 메시지 (CS→CP 포함, RemoteStartTransaction 감지 위해 allMessages 사용)
             LocalDateTime windowStart = stTs.minusMinutes(10);
@@ -434,7 +477,7 @@ public class AnalysisService {
             if (stp == null) {
                 addViolation(violations, "WARN", stTs,
                         sessionLabel + ": 대응하는 StopTransaction 없음",
-                        effectiveChargerId, txId, null);
+                        chargerId, txId, null);
                 continue;
             }
 
@@ -443,7 +486,7 @@ public class AnalysisService {
             // StartTx~StopTx 사이 Charging 상태 체크
             boolean hasCharging = calls.stream()
                     .filter(m -> m.getTimestamp() != null
-                            && m.getTimestamp().isAfter(stTs)
+                            && !m.getTimestamp().isBefore(stTs)
                             && m.getTimestamp().isBefore(stpTs))
                     .anyMatch(m -> "StatusNotification".equals(m.getAction())
                             && m.getPayloadDetail() != null
@@ -451,7 +494,7 @@ public class AnalysisService {
             if (!hasCharging) {
                 addViolation(violations, "WARN", stTs,
                         sessionLabel + ": StartTransaction 후 StatusNotification(Charging) 없음",
-                        effectiveChargerId, txId, null);
+                        chargerId, txId, null);
             }
         }
     }
