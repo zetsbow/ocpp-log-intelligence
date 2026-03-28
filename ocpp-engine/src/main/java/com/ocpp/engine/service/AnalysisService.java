@@ -216,6 +216,7 @@ public class AnalysisService {
             if (msg.isCall()) {
                 // ── Call 처리 ──────────────────────────────────────────────
                 e.setAction(msg.getDisplayAction());
+                if (e.getAction() == null || e.getAction().isBlank()) continue;
                 e.setMessageType("Call");
                 e.setDirection("CP→CS");
                 e.setDetailText(toDetailText(msg.getPayloadDetail()));
@@ -234,7 +235,9 @@ public class AnalysisService {
 
             } else if (msg.isCallResult()) {
                 // ── CallResult 처리 ────────────────────────────────────────
-                e.setAction(uidToDisplay.getOrDefault(msg.getUniqueId(), "Unknown"));
+                String displayAction = uidToDisplay.get(msg.getUniqueId());
+                if (displayAction == null) continue;
+                e.setAction(displayAction);
                 e.setMessageType("CallResult");
                 e.setDirection("CS→CP");
                 e.setStatus(msg.getStatus());
@@ -260,7 +263,9 @@ public class AnalysisService {
 
             } else {
                 // ── CallError 처리 ─────────────────────────────────────────
-                e.setAction(uidToDisplay.getOrDefault(msg.getUniqueId(), "Unknown"));
+                String displayAction = uidToDisplay.get(msg.getUniqueId());
+                if (displayAction == null) continue;
+                e.setAction(displayAction);
                 e.setMessageType("CallError");
                 e.setDirection("CS→CP");
                 e.setStatus(msg.getStatus());
@@ -344,12 +349,13 @@ public class AnalysisService {
                     heartbeats.get(i).getTimestamp());
             if (gapMin > 11) {
                 LocalDateTime ts = heartbeats.get(i).getTimestamp();
+                String effectiveChargerId = chargerId != null ? chargerId : heartbeats.get(i).getChargerId();
                 addViolation(violations, "WARN", ts,
                         String.format("Heartbeat 간격 초과: %s → %s (%d분)",
                                 heartbeats.get(i - 1).getTimestamp().format(TS_FMT),
                                 ts.format(TS_FMT),
                                 gapMin),
-                        chargerId,
+                        effectiveChargerId,
                         findActiveTxId(allMessages, uidToDisplay, ts), null);
             }
         }
@@ -368,7 +374,8 @@ public class AnalysisService {
                     String vendorErrorCode = m.getPayloadDetail().getOrDefault("vendorErrorCode", "");
                     String msg = "StatusNotification Faulted - errorCode=" + errorCode
                             + (vendorErrorCode.isBlank() ? "" : ", vendorErrorCode=" + vendorErrorCode);
-                    addViolation(violations, "ERROR", m.getTimestamp(), msg, chargerId,
+                    String effectiveChargerId = chargerId != null ? chargerId : m.getChargerId();
+                    addViolation(violations, "ERROR", m.getTimestamp(), msg, effectiveChargerId,
                             findActiveTxId(allMessages, uidToDisplay, m.getTimestamp()), m.getUniqueId());
                 });
     }
@@ -392,6 +399,7 @@ public class AnalysisService {
             LocalDateTime nextStTs = (i + 1 < startTxList.size()) ? startTxList.get(i + 1).getTimestamp() : null;
             String sessionLabel    = String.format("세션%d(%s)", i + 1, stTs.format(TS_FMT));
             String txId            = uidToTxId.get(st.getUniqueId());
+            String effectiveChargerId = chargerId != null ? chargerId : st.getChargerId();
 
             // StartTx 이전 10분 내 전체 메시지 (CS→CP 포함, RemoteStartTransaction 감지 위해 allMessages 사용)
             LocalDateTime windowStart = stTs.minusMinutes(10);
@@ -418,7 +426,7 @@ public class AnalysisService {
             if (stp == null) {
                 addViolation(violations, "WARN", stTs,
                         sessionLabel + ": 대응하는 StopTransaction 없음",
-                        chargerId, txId, null);
+                        effectiveChargerId, txId, null);
                 continue;
             }
 
@@ -435,7 +443,7 @@ public class AnalysisService {
             if (!hasCharging) {
                 addViolation(violations, "WARN", stTs,
                         sessionLabel + ": StartTransaction 후 StatusNotification(Charging) 없음",
-                        chargerId, txId, null);
+                        effectiveChargerId, txId, null);
             }
         }
     }

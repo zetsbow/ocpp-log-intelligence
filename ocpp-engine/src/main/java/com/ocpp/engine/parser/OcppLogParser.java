@@ -162,6 +162,12 @@ public class OcppLogParser {
             case "StatusNotification":
                 putIfExists(detail, payload, "status");
                 putIfExists(detail, payload, "errorCode");
+                String sVal = payload.has("status") ? payload.get("status").asText("") : "";
+                if ("Faulted".equals(sVal)) {
+                    detail.put("vendorErrorCode", payload.has("vendorErrorCode") ? payload.get("vendorErrorCode").asText() : "");
+                } else {
+                    putIfExists(detail, payload, "vendorErrorCode");
+                }
                 break;
             case "MeterValues":
                 JsonNode mvArr = payload.path("meterValue");
