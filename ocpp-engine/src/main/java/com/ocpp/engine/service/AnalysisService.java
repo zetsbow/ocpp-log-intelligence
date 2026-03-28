@@ -377,10 +377,10 @@ public class AnalysisService {
             long gapMin = ChronoUnit.MINUTES.between(
                     heartbeats.get(i - 1).getTimestamp(),
                     heartbeats.get(i).getTimestamp());
-            if (gapMin > 11) {
+            if (gapMin > 15) {
                 LocalDateTime ts = heartbeats.get(i).getTimestamp();
                 addViolation(violations, "WARN", ts,
-                        String.format("Heartbeat 간격 초과: %s → %s (%d분)",
+                        String.format("Heartbeat 간격 초과 (15분): %s → %s (%d분)",
                                 heartbeats.get(i - 1).getTimestamp().format(TS_FMT),
                                 ts.format(TS_FMT),
                                 gapMin),
@@ -475,6 +475,16 @@ public class AnalysisService {
                     .findFirst().orElse(null);
 
             if (stp == null) {
+                // StartTx 이후 Charging 외 StatusNotification이 없으면 로그 끝까지 충전 중 → 위반 아님
+                boolean hasNonChargingStatus = calls.stream()
+                        .filter(m -> m.getTimestamp() != null
+                                && m.getTimestamp().isAfter(stTs)
+                                && (nextStTs == null || m.getTimestamp().isBefore(nextStTs)))
+                        .anyMatch(m -> "StatusNotification".equals(m.getAction())
+                                && m.getPayloadDetail() != null
+                                && !"Charging".equals(m.getPayloadDetail().get("status")));
+                if (!hasNonChargingStatus) continue;
+
                 addViolation(violations, "WARN", stTs,
                         sessionLabel + ": 대응하는 StopTransaction 없음",
                         chargerId, txId, null);

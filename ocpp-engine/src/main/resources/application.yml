@@ -1,7 +1,13 @@
 server:
   port: 7778
+  tomcat:
+    max-http-form-post-size: 200MB
 
 spring:
+  servlet:
+    multipart:
+      max-request-size: 200MB
+      max-file-size: 200MB
   application:
     name: ocpp-engine
   datasource:
