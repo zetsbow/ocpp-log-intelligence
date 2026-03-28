@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ocpp.engine.mapper.FlowViolationMapper">
+
+    <resultMap id="rm" type="FlowViolation">
+        <id     property="id"            column="id"/>
+        <result property="sessionId"     column="session_id"/>
+        <result property="transactionId" column="transaction_id"/>
+        <result property="chargerId"     column="charger_id"/>
+        <result property="severity"      column="severity"/>
+        <result property="timestamp"     column="log_timestamp"/>
+        <result property="message"       column="message"/>
+    </resultMap>
+
+    <insert id="insertAll">
+        INSERT INTO flow_violation
+            (session_id, transaction_id, charger_id, severity, log_timestamp, message)
+        VALUES
+        <foreach collection="list" item="v" separator=",">
+            (#{v.sessionId}, #{v.transactionId}, #{v.chargerId}, #{v.severity}, #{v.timestamp}, #{v.message})
+        </foreach>
+    </insert>
+
+    <select id="findByAnalysisId" resultMap="rm">
+        SELECT * FROM flow_violation
+        WHERE session_id = #{analysisId}
+        ORDER BY id
+    </select>
+
+</mapper>

@@ -3,6 +3,7 @@ package com.ocpp.engine.dto;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * OCPP 전문 메시지 파싱 결과 DTO
@@ -39,6 +40,12 @@ public class OcppMessage {
     /** 원본 로그 라인 */
     private String rawLine;
 
+    /** DataTransfer의 messageId (ex: Tariff, AdvancePayment, BoardReceiveData) */
+    private String dataTransferMessageId;
+
+    /** 전문별 주요 필드 추출 결과 (파서에서 채움) */
+    private Map<String, String> payloadDetail;
+
     public boolean isCall() {
         return messageTypeId == 2;
     }
@@ -49,5 +56,14 @@ public class OcppMessage {
 
     public boolean isCallError() {
         return messageTypeId == 4;
+    }
+
+    /** 화면 표시용 전문명 (DataTransfer는 messageId 포함) */
+    public String getDisplayAction() {
+        if ("DataTransfer".equals(action)
+                && dataTransferMessageId != null && !dataTransferMessageId.isBlank()) {
+            return "DataTransfer(" + dataTransferMessageId + ")";
+        }
+        return action;
     }
 }

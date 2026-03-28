@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ocpp.engine.mapper.OcppFlowEntryMapper">
+
+    <resultMap id="rm" type="OcppFlowEntry">
+        <id     property="id"            column="id"/>
+        <result property="sessionId"     column="session_id"/>
+        <result property="transactionId" column="transaction_id"/>
+        <result property="chargerId"     column="charger_id"/>
+        <result property="timestamp"     column="log_timestamp"/>
+        <result property="action"        column="action"/>
+        <result property="messageType"   column="message_type"/>
+        <result property="direction"     column="direction"/>
+        <result property="status"        column="status"/>
+        <result property="detailText"    column="detail_text"/>
+    </resultMap>
+
+    <insert id="insertAll">
+        INSERT INTO transaction_detail
+            (session_id, transaction_id, charger_id, log_timestamp, action, message_type, direction, status, detail_text)
+        VALUES
+        <foreach collection="list" item="e" separator=",">
+            (#{e.sessionId}, #{e.transactionId}, #{e.chargerId}, #{e.timestamp}, #{e.action},
+             #{e.messageType}, #{e.direction}, #{e.status}, #{e.detailText})
+        </foreach>
+    </insert>
+
+    <select id="findByAnalysisId" resultMap="rm">
+        SELECT * FROM transaction_detail
+        WHERE session_id = #{analysisId}
+        ORDER BY id
+    </select>
+
+</mapper>

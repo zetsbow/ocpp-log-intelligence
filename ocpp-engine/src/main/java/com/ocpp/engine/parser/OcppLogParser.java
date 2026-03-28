@@ -10,15 +10,17 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * OCPP 로그 파서
  * 지원 포맷:
- *   1) 순수 OCPP JSON: [2,"id","Action",{...}]
- *   2) 타임스탬프 포함: 2024-01-01 12:00:00 CHARGER_01 [2,"id","Action",{...}]
+ *   1) KEVIT 데몬 형식: 2026-03-26 00:00:00 - [TXT][CHARGER_ID] : MESSAGE : [2,"id","Action",{...}]
+ *   2) 일반 형식: 2024-01-01 12:00:00 CHARGER_01 [2,"id","Action",{...}]
  */
 @Slf4j
 @Component
@@ -27,12 +29,12 @@ public class OcppLogParser {
 
     private final ObjectMapper objectMapper;
 
-    // 로그 라인에서 OCPP JSON 배열 추출 패턴
-    private static final Pattern OCPP_ARRAY_PATTERN = Pattern.compile("(\\[\\s*[234]\\s*,.*?\\]\\s*)$");
-    // 타임스탬프 패턴
     private static final Pattern TIMESTAMP_PATTERN =
             Pattern.compile("(\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2})");
-    // 충전기 ID 패턴 (타임스탬프 뒤 첫 번째 토큰)
+    /** KEVIT 데몬 형식: [TXT][CHARGER_ID] */
+    private static final Pattern TXT_CHARGER_ID_PATTERN =
+            Pattern.compile("\\[TXT\\]\\[([^\\]]+)\\]");
+    /** 일반 형식: timestamp CHARGER_ID [...] */
     private static final Pattern CHARGER_ID_PATTERN =
             Pattern.compile("\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}\\s+(\\S+)\\s+\\[");
 
@@ -61,7 +63,6 @@ public class OcppLogParser {
      * 단일 로그 라인 파싱
      */
     public OcppMessage parseLine(String line) {
-        // OCPP 배열 부분 추출
         String jsonPart = extractJsonPart(line);
         if (jsonPart == null) return null;
 
@@ -77,37 +78,34 @@ public class OcppLogParser {
         msg.setRawLine(line);
         msg.setMessageTypeId(root.get(0).asInt());
         msg.setUniqueId(root.get(1).asText());
-
-        // 타임스탬프 추출
         msg.setTimestamp(extractTimestamp(line));
-        // 충전기 ID 추출
         msg.setChargerId(extractChargerId(line));
 
         if (msg.isCall()) {
-            // [2, uniqueId, Action, Payload]
             if (root.size() >= 3) msg.setAction(root.get(2).asText());
             if (root.size() >= 4) {
                 JsonNode payload = root.get(3);
                 msg.setRawPayload(payload.toString());
-                // transactionId 추출 시도
                 if (payload.has("transactionId"))
                     msg.setTransactionId(payload.get("transactionId").asText());
+                if ("DataTransfer".equals(msg.getAction()) && payload.has("messageId"))
+                    msg.setDataTransferMessageId(payload.get("messageId").asText());
+                msg.setPayloadDetail(extractPayloadDetail(msg.getAction(), payload));
             }
         } else if (msg.isCallResult()) {
-            // [3, uniqueId, Payload]
             if (root.size() >= 3) {
                 JsonNode payload = root.get(2);
                 msg.setRawPayload(payload.toString());
-                // status 추출
                 if (payload.has("status"))
                     msg.setStatus(payload.get("status").asText());
                 else if (payload.has("idTagInfo") && payload.get("idTagInfo").has("status"))
                     msg.setStatus(payload.get("idTagInfo").get("status").asText());
+                else if (payload.has("currentTime"))
+                    msg.setStatus(payload.get("currentTime").asText());
                 if (payload.has("transactionId"))
                     msg.setTransactionId(payload.get("transactionId").asText());
             }
         } else if (msg.isCallError()) {
-            // [4, uniqueId, ErrorCode, ErrorDescription, ErrorDetails]
             if (root.size() >= 3) msg.setStatus(root.get(2).asText());
         }
 
@@ -115,18 +113,21 @@ public class OcppLogParser {
     }
 
     private String extractJsonPart(String line) {
-        // 대괄호로 시작하는 OCPP 배열 찾기
-        int idx = line.indexOf('[');
+        // KEVIT 데몬 형식: "MESSAGE : [...]"
+        int msgIdx = line.indexOf("MESSAGE : ");
+        int fromIdx = (msgIdx != -1) ? msgIdx + "MESSAGE : ".length() : 0;
+        return extractJsonArray(line, fromIdx);
+    }
+
+    private String extractJsonArray(String line, int fromIdx) {
+        int idx = line.indexOf('[', fromIdx);
         if (idx == -1) return null;
-        // 마지막 ']' 찾기 (중첩 고려)
-        int depth = 0;
-        int end = -1;
+        int depth = 0, end = -1;
         for (int i = idx; i < line.length(); i++) {
             char c = line.charAt(i);
             if (c == '[') depth++;
             else if (c == ']') {
-                depth--;
-                if (depth == 0) { end = i; break; }
+                if (--depth == 0) { end = i; break; }
             }
         }
         if (end == -1) return null;
@@ -145,8 +146,55 @@ public class OcppLogParser {
     }
 
     private String extractChargerId(String line) {
-        Matcher m = CHARGER_ID_PATTERN.matcher(line);
+        // KEVIT 데몬 형식 우선: [TXT][CHARGER_ID]
+        Matcher m = TXT_CHARGER_ID_PATTERN.matcher(line);
+        if (m.find()) return m.group(1);
+        // 일반 형식
+        m = CHARGER_ID_PATTERN.matcher(line);
         if (m.find()) return m.group(1);
         return "UNKNOWN";
+    }
+
+    private Map<String, String> extractPayloadDetail(String action, JsonNode payload) {
+        Map<String, String> detail = new LinkedHashMap<>();
+        if (payload == null || payload.isMissingNode()) return detail;
+        switch (action != null ? action : "") {
+            case "StatusNotification":
+                putIfExists(detail, payload, "status");
+                putIfExists(detail, payload, "errorCode");
+                break;
+            case "MeterValues":
+                JsonNode mvArr = payload.path("meterValue");
+                if (mvArr.isArray() && mvArr.size() > 0) {
+                    JsonNode svArr = mvArr.get(0).path("sampledValue");
+                    if (svArr.isArray()) {
+                        for (JsonNode sv : svArr) {
+                            String msr = sv.path("measurand").asText("");
+                            String val = sv.path("value").asText("");
+                            if ("Energy.Active.Import.Register".equals(msr))  detail.put("Wh", val);
+                            else if ("Current.Import".equals(msr))            detail.put("A", val);
+                            else if ("Voltage".equals(msr))                   detail.put("V", val);
+                            else if ("SoC".equals(msr))                       detail.put("SoC%", val);
+                        }
+                    }
+                }
+                break;
+            case "StartTransaction":
+                putIfExists(detail, payload, "meterStart");
+                putIfExists(detail, payload, "idTag");
+                break;
+            case "StopTransaction":
+                putIfExists(detail, payload, "meterStop");
+                putIfExists(detail, payload, "reason");
+                putIfExists(detail, payload, "idTag");
+                break;
+            default:
+                break;
+        }
+        return detail;
+    }
+
+    private void putIfExists(Map<String, String> map, JsonNode node, String key) {
+        if (node.has(key)) map.put(key, node.get(key).asText());
     }
 }

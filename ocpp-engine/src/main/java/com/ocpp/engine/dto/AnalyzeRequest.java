@@ -23,4 +23,7 @@ public class AnalyzeRequest {
 
     /** 파일명 */
     private String fileName;
+
+    /** 서버 로컬 파일 경로 (logContent가 없을 때 파일 직접 읽기) */
+    private String filePath;
 }

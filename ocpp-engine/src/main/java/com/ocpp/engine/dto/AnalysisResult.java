@@ -10,14 +10,22 @@ import java.util.List;
  */
 @Data
 public class AnalysisResult {
-    private Long id;
     private String chargerId;
     private LocalDateTime analyzedAt;
-    private int totalMsgCount;
-    private int faultCount;
+    private int totalTransaction;
+    private int faultTransactionCount;
     private String analysisType;  // BATCH / MANUAL
     private String fileName;
     private String summary;
+
+    /** 세션 ID: 파일명의 마지막 _ 뒤 문자열 (ex: 20260328-0001) */
+    private String sessionId;
+
+    /** 파일 내 충전 세션(StartTransaction) 총 건수 */
+    private int transactionCount;
+
+    /** 흐름 위반이 발생한 세션 건수 */
+    private int errorTransactionCount;
 
     /** 탐지된 장애 목록 (조회 전용) */
     private List<FaultDetection> detections;
