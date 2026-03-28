@@ -36,7 +36,7 @@ ALTER TABLE transaction_detail
 UPDATE transaction_detail SET is_fault = 'Y' WHERE is_fault = '1';
 UPDATE transaction_detail SET is_fault = 'N' WHERE is_fault = '0';
 UPDATE transaction_detail SET is_fault = 'N' WHERE is_fault IS NULL OR is_fault = '';
-
+ㅈ
 -- KEVIT 충전 흐름 위반 이슈 테이블 (세션 ID 기반)
 DROP TABLE IF EXISTS flow_violation;
 CREATE TABLE IF NOT EXISTS flow_violation (
