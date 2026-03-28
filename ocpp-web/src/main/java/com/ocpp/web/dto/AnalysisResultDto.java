@@ -1,5 +1,6 @@
 package com.ocpp.web.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -8,14 +9,13 @@ import java.util.List;
 @Data
 public class AnalysisResultDto {
 
-    /** 분석 세션 ID (PK, CHAR(13)) — 예: 20260328-0001 */
     private String        sessionId;
-
-    /** 분석에 사용된 파일 URL */
     private String        fileUrl;
-
     private String        chargerId;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime analyzedAt;
+
     private int           totalTransaction;
     private int           faultTransactionCount;
     private String        analysisType;

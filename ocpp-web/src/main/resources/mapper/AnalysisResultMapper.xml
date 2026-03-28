@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ocpp.web.mapper.AnalysisResultMapper">
+
+    <resultMap id="rm" type="AnalysisResultDto">
+        <result property="sessionId"             column="session_id"/>
+        <result property="chargerId"             column="charger_id"/>
+        <result property="analyzedAt"            column="analyzed_at"/>
+        <result property="totalTransaction"      column="total_transaction"/>
+        <result property="faultTransactionCount" column="fault_transaction_count"/>
+        <result property="analysisType"          column="analysis_type"/>
+        <result property="fileName"              column="file_name"/>
+        <result property="summary"               column="summary"/>
+    </resultMap>
+
+    <!-- sessionId로 분석 결과 단건 조회 -->
+    <select id="findBySessionId" resultMap="rm">
+        SELECT
+            session_id,
+            charger_id,
+            analyzed_at,
+            total_transaction,
+            fault_transaction_count,
+            analysis_type,
+            file_name,
+            summary
+        FROM analysis_result
+        WHERE session_id = #{sessionId}
+    </select>
+
+    <!-- 최근 분석 이력 목록 조회 -->
+    <select id="findRecent" resultMap="rm">
+        SELECT
+            session_id,
+            charger_id,
+            analyzed_at,
+            total_transaction,
+            fault_transaction_count,
+            analysis_type,
+            file_name,
+            summary
+        FROM analysis_result
+        ORDER BY analyzed_at DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

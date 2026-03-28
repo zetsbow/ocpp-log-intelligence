@@ -34,7 +34,7 @@
     </select>
 
     <select id="findById" resultMap="resultRM">
-        SELECT * FROM analysis_result WHERE session_id = #{id}
+        SELECT * FROM analysis_result WHERE session_id = #{sessionId}
     </select>
 
 </mapper>

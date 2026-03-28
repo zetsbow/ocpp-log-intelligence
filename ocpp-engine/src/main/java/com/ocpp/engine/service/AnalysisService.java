@@ -10,10 +10,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -31,6 +30,7 @@ public class AnalysisService {
     private final FaultDetectionMapper faultDetectionMapper;
     private final OcppFlowEntryMapper ocppFlowEntryMapper;
     private final FlowViolationMapper flowViolationMapper;
+    private final RestTemplate restTemplate;
 
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -41,15 +41,21 @@ public class AnalysisService {
     public AnalysisResult analyze(AnalyzeRequest request) {
         log.info("분석 시작 - 충전기: {}, 파일: {}", request.getChargerId(), request.getFileName());
 
-        // 0. filePath로 파일 직접 읽기 (logContent가 없을 때)
+        // 0. fileUrl로 HTTP GET → logContent 세팅 (logContent가 없을 때)
         if ((request.getLogContent() == null || request.getLogContent().isBlank())
                 && request.getFileUrl() != null && !request.getFileUrl().isBlank()) {
             try {
-                request.setLogContent(Files.readString(Paths.get(request.getFileUrl())));
-                if (request.getFileName() == null)
-                    request.setFileName(Paths.get(request.getFileUrl()).getFileName().toString());
-            } catch (IOException e) {
-                throw new RuntimeException("로그 파일 읽기 실패: " + request.getFileUrl(), e);
+                String content = restTemplate.getForObject(URI.create(request.getFileUrl()), String.class);
+                if (content == null || content.isBlank())
+                    throw new RuntimeException("파일 내용이 비어있습니다: " + request.getFileUrl());
+                request.setLogContent(content);
+                if (request.getFileName() == null) {
+                    String url = request.getFileUrl();
+                    request.setFileName(url.substring(url.lastIndexOf('/') + 1));
+                }
+                log.info("[AnalysisService] fileUrl 다운로드 완료: {} bytes", content.length());
+            } catch (Exception e) {
+                throw new RuntimeException("로그 파일 URL 호출 실패: " + request.getFileUrl() + " → " + e.getMessage(), e);
             }
         }
 
@@ -62,8 +68,11 @@ public class AnalysisService {
         // 3. 패턴 매칭 (기존 FaultPattern 기반)
         List<FaultDetection> detections = patternMatcher.match(filtered);
 
-        // 4. 세션 ID 추출 (파일명 마지막 _ 뒤 문자열)
-        String sessionId = extractSessionId(request.getFileName());
+        // 4. 세션 ID: web에서 전달한 값 우선, 없으면 파일명에서 추출
+        String sessionId = (request.getSessionId() != null && !request.getSessionId().isBlank())
+                ? request.getSessionId()
+                : extractSessionId(request.getFileName());
+        log.info("[AnalysisService] sessionId={} (fileName={})", sessionId, request.getFileName());
 
         // 5. transaction_count: StartTransaction Call 건수
         int transactionCount = (int) filtered.stream()
