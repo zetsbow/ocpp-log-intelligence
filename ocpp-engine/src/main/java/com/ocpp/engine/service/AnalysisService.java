@@ -11,12 +11,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,8 +22,8 @@ import java.util.stream.Collectors;
  * 로그 분석 서비스
  *
  * [로그 내용 확보 우선순위]
- * 1. filePath → 동일 서버 공유 경로에서 직접 파일 읽기 (기본)
- * 2. logContent → 배치 스케줄러가 내용을 직접 전달할 때
+ * 1. fileUrl  → web 서버 URL 호출로 파일 내용 다운로드 (기본)
+ * 2. logContent → 배치 스케줄러가 직접 내용 전달할 때
  */
 @Slf4j
 @Service
@@ -37,10 +34,11 @@ public class AnalysisService {
     private final PatternMatcherService patternMatcher;
     private final AnalysisResultMapper  analysisResultMapper;
     private final FaultDetectionMapper  faultDetectionMapper;
+    private final RestTemplate          restTemplate;
 
     @Transactional
     public AnalysisResult analyze(AnalyzeRequest request) {
-        log.info("분석 시작 - chargerId={}, filePath={}", request.getChargerId(), request.getFilePath());
+        log.info("분석 시작 - chargerId={}, fileUrl={}", request.getChargerId(), request.getFileUrl());
 
         // 1. 파일 내용 읽기
         String logContent = readLogContent(request);
@@ -52,7 +50,7 @@ public class AnalysisService {
 
         List<FaultDetection> detections = patternMatcher.match(filtered);
 
-        // 3. 분석 이력 저장
+        // 3. 이력 저장
         AnalysisResult result = new AnalysisResult();
         result.setChargerId(request.getChargerId());
         result.setAnalyzedAt(LocalDateTime.now());
@@ -76,32 +74,40 @@ public class AnalysisService {
 
     /**
      * 로그 내용 확보
-     * filePath 우선 → logContent fallback
+     * 1순위: fileUrl → HTTP GET으로 web 서버에서 파일 내용 다운로드
+     * 2순위: logContent → 배치 스케줄러 직접 전달
      */
     private String readLogContent(AnalyzeRequest request) {
 
-        // filePath: 동일 서버 공유 경로에서 직접 읽기
-        if (!isBlank(request.getFilePath())) {
-            Path path = Paths.get(request.getFilePath());
-            if (!Files.exists(path)) {
-                throw new IllegalArgumentException("파일을 찾을 수 없습니다: " + request.getFilePath());
-            }
+        // ── 1순위: fileUrl (URL 인코딩된 주소로 HTTP GET 호출) ──
+        if (!isBlank(request.getFileUrl())) {
+            log.info("[AnalysisService] fileUrl 호출: {}", request.getFileUrl());
             try {
-                String content = Files.readString(path, StandardCharsets.UTF_8);
-                log.info("파일 읽기 완료: {} ({} bytes)", path.getFileName(), content.length());
+                // URI.create()를 사용하면 이미 인코딩된 URL도 그대로 사용 가능
+                String content = restTemplate.getForObject(
+                        URI.create(request.getFileUrl()), String.class);
+
+                if (content == null || content.isBlank()) {
+                    throw new RuntimeException("파일 내용이 비어있습니다: " + request.getFileUrl());
+                }
+                log.info("[AnalysisService] 파일 다운로드 완료: {} bytes", content.length());
                 return content;
-            } catch (IOException e) {
-                throw new RuntimeException("파일 읽기 실패: " + request.getFilePath(), e);
+
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        "파일 URL 호출 실패: " + request.getFileUrl() + " → " + e.getMessage(), e);
             }
         }
 
-        // logContent: 배치 스케줄러 직접 전달
+        // ── 2순위: logContent (배치 스케줄러) ──────────────────
         if (!isBlank(request.getLogContent())) {
-            log.info("직접 전달된 logContent 사용: {} bytes", request.getLogContent().length());
+            log.info("[AnalysisService] logContent 직접 사용: {} bytes",
+                    request.getLogContent().length());
             return request.getLogContent();
         }
 
-        throw new IllegalArgumentException("분석할 로그가 없습니다. filePath 또는 logContent를 확인하세요.");
+        throw new IllegalArgumentException(
+                "분석할 로그가 없습니다. fileUrl 또는 logContent를 확인하세요.");
     }
 
     private List<OcppMessage> filterMessages(List<OcppMessage> messages, AnalyzeRequest req) {
@@ -116,8 +122,11 @@ public class AnalysisService {
     }
 
     private String resolveFileName(AnalyzeRequest req) {
-        if (!isBlank(req.getFileName()))  return req.getFileName();
-        if (!isBlank(req.getFilePath()))  return Paths.get(req.getFilePath()).getFileName().toString();
+        if (!isBlank(req.getFileName())) return req.getFileName();
+        if (!isBlank(req.getFileUrl())) {
+            String url = req.getFileUrl();
+            return url.substring(url.lastIndexOf('/') + 1); // 인코딩된 파일명 그대로
+        }
         return "unknown";
     }
 

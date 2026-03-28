@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 @Data
 public class AnalyzeRequest {
-    /** 충전기 ID 필터 (null = 전체) */
+    /** 충전기 ID 필터 */
     private String chargerId;
 
     /** 시간 범위 필터 */
@@ -14,11 +14,11 @@ public class AnalyzeRequest {
     private LocalDateTime toTime;
 
     /**
-     * 저장된 파일의 절대 경로
-     * web과 동일 서버이므로 직접 Files.readString()으로 읽음
-     * 예) C:/ocpp-logs/upload/20250328_100000_sample.log
+     * 파일 URL (URL 인코딩 적용)
+     * 예) http://localhost:7777/log/upload/%EC%A0%95%EC%83%81...txt
+     * engine이 HTTP GET으로 호출하여 파일 내용을 읽음
      */
-    private String filePath;
+    private String fileUrl;
 
     /** 원본 파일명 (이력 저장용) */
     private String fileName;

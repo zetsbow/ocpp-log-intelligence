@@ -36,14 +36,17 @@ mybatis:
     default-statement-timeout: 30
 
 engine:
-  url: http://localhost:7778
+  url: http://127.0.0.1:7778
 
 ocpp:
   log:
-    # 실행 위치(jar 위치) 기준 상대경로 → 어느 서버에 배포해도 자동 생성
-    # 개발 PC: ocpp-web 모듈 루트/logs/upload
-    # 운영 서버: jar 실행 위치/logs/upload
     upload-dir: ./logs/upload
+  web:
+    # engine이 파일을 다운로드할 때 사용하는 web 서버 base URL
+    # web과 engine이 동일 서버이므로 127.0.0.1 사용
+    # 운영 서버 분리 배포 시 실제 IP 또는 도메인으로 변경
+    # 예) http://192.168.1.10:7777
+    base-url: http://127.0.0.1:7777
 
 logging:
   level:
